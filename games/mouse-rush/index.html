@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#2a2350" />
+<title>Mouse Rush</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <!-- ===== In-game HUD (shown during play) ===== -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-pill">
+        <span class="hud-label">LV</span>
+        <span id="hudLevel">1</span>
+      </div>
+      <div class="hud-pill" id="hudWorldPill">
+        <span class="dot" id="hudWorldDot"></span>
+        <span id="hudWorld">Kitchen</span>
+      </div>
+      <div class="hud-pill">
+        <span class="cheese"></span>
+        <span id="hudFood">0</span>
+      </div>
+    </div>
+    <div class="hud-dist"><span id="hudDist">0</span><span class="m">m</span></div>
+    <div id="combo" class="combo hidden"></div>
+  </div>
+
+  <!-- ===== Title screen ===== -->
+  <div id="title" class="screen">
+    <div class="title-card">
+      <div class="logo">
+        <span class="logo-mouse" aria-hidden="true"></span>
+        <h1>Mouse&nbsp;Rush</h1>
+      </div>
+      <button id="playBtn" class="btn btn-play">▶</button>
+      <div class="best-row">
+        <div class="best-item"><span class="best-k">BEST</span><span id="titleBest">0</span><span class="m">m</span></div>
+        <div class="best-item"><span class="best-k">MAX LV</span><span id="titleMaxLv">1</span></div>
+      </div>
+      <div class="how">
+        <div class="how-item"><span class="key">← →</span><span class="key">swipe</span><small>move</small></div>
+        <div class="how-item"><span class="key">↑</span><span class="key">swipe up</span><small>jump</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Game over screen ===== -->
+  <div id="over" class="screen hidden">
+    <div class="over-card">
+      <div id="overFace" class="over-face"></div>
+      <div class="over-stats">
+        <div class="stat big"><span id="overDist">0</span><span class="m">m</span></div>
+        <div class="stat-row">
+          <div class="stat"><span class="stat-k">LV</span><span id="overLevel">1</span></div>
+          <div class="stat"><span class="cheese"></span><span id="overFood">0</span></div>
+          <div class="stat"><span class="stat-k">BEST</span><span id="overBest">0</span></div>
+        </div>
+        <div id="newBest" class="new-best hidden">NEW BEST!</div>
+      </div>
+
+      <!-- AD: Continue placeholder. A rewarded ad can revive the player here. -->
+      <button id="continueBtn" class="btn btn-continue hidden">▶▶ Continue</button>
+
+      <div class="over-actions">
+        <button id="retryBtn" class="btn btn-retry">↺</button>
+        <a class="btn btn-home" href="../../">⌂</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
