@@ -3,28 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hesvyn Play</title>
+  <title>Hesvyn Play | Free Browser Games</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="container">
-    <h1>Hesvyn Play</h1>
-    <p>Free browser games. Play instantly.</p>
+  <header class="site-header">
+    <a class="logo" href="./">
+      <span class="logo-mark">🎮</span>
+      <span>Hesvyn Play</span>
+    </a>
 
-    <section class="games">
-      <h2>Games</h2>
-
-      <a class="game-card" href="./games/game01/">
-        <strong>Game 01</strong>
-        <span>Play now</span>
-      </a>
-    </section>
-
-    <footer>
-      <a href="./privacy.html">Privacy Policy</a>
+    <nav class="nav">
+      <a href="./">Home</a>
+      <a href="./privacy.html">Privacy</a>
       <a href="./terms.html">Terms</a>
       <a href="./contact.html">Contact</a>
-    </footer>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <span class="hero-badge">Free browser games · Instant play</span>
+      <h1>Quick games for endless retries.</h1>
+      <p>
+        Play simple, fast, and addictive browser games directly from your device.
+        No downloads. No installation. Just press play.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="./games/game01/">Play Latest Game</a>
+        <a class="btn btn-secondary" href="#games">Browse Games</a>
+      </div>
+    </section>
+
+    <section id="games">
+      <div class="section-title">
+        <div>
+          <h2>Games</h2>
+          <p>Fresh experiments, fast rounds, instant fun.</p>
+        </div>
+      </div>
+
+      <div class="games-grid">
+        <a class="game-card" href="./games/game01/">
+          <div class="game-thumb">⚡</div>
+          <div class="game-info">
+            <strong>Game 01</strong>
+            <span>Fast prototype · Play instantly</span>
+            <div class="play-pill">Play Now</div>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <p class="footer-note">
+      © 2026 Hesvyn Play. Free browser games for quick breaks.
+    </p>
   </main>
 </body>
 </html>
