@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -11,41 +11,66 @@
 <div id="app">
   <canvas id="game"></canvas>
 
-  <!-- ===== In-game HUD (shown during play) ===== -->
+  <!-- ===== Loading screen ===== -->
+  <div id="loading" class="screen">
+    <div class="loading-card">
+      <div class="loading-mouse" aria-hidden="true"></div>
+      <div class="loading-title">Mouse Rush</div>
+      <div class="loading-bar"><div id="loadingFill" class="loading-fill"></div></div>
+      <div id="loadingPct" class="loading-pct">0%</div>
+    </div>
+  </div>
+
+  <!-- ===== In-game HUD ===== -->
   <div id="hud" class="hidden">
-    <div class="hud-top">
-      <div class="hud-pill">
-        <span class="hud-label">LV</span>
-        <span id="hudLevel">1</span>
+    <div class="hud-left">
+      <div class="hud-panel panel-score">
+        <span class="hud-k">SCORE</span>
+        <span id="hudScore" class="hud-v">0</span>
       </div>
-      <div class="hud-pill" id="hudWorldPill">
-        <span class="dot" id="hudWorldDot"></span>
-        <span id="hudWorld">Kitchen</span>
-      </div>
-      <div class="hud-pill">
-        <span class="cheese"></span>
-        <span id="hudFood">0</span>
+      <div class="hud-sub">
+        <div class="hud-panel small panel-level">
+          <span class="hud-k">LV</span>
+          <span id="hudLevel" class="hud-v">1</span>
+        </div>
+        <div class="hud-panel small panel-world">
+          <span id="hudWorld" class="hud-v world">Kitchen</span>
+        </div>
       </div>
     </div>
-    <div class="hud-dist"><span id="hudDist">0</span><span class="m">m</span></div>
-    <div id="combo" class="combo hidden"></div>
+    <div class="hud-right">
+      <div class="hud-panel panel-cheese">
+        <span class="cheese-icon" aria-hidden="true"></span>
+        <span id="hudCheese" class="hud-v">0</span>
+      </div>
+    </div>
   </div>
 
   <!-- ===== Title screen ===== -->
-  <div id="title" class="screen">
+  <div id="title" class="screen hidden">
     <div class="title-card">
-      <div class="logo">
-        <span class="logo-mouse" aria-hidden="true"></span>
-        <h1>Mouse&nbsp;Rush</h1>
-      </div>
-      <button id="playBtn" class="btn btn-play">▶</button>
+      <img id="logoImg" class="logo-img" src="assets/ui/logo.png" alt="Mouse Rush"
+           onerror="this.style.display='none';document.getElementById('logoText').style.display='block';" />
+      <h1 id="logoText" class="logo-text" style="display:none;">Mouse&nbsp;Rush</h1>
+
+      <button id="playBtn" class="btn btn-img" aria-label="Play">
+        <img class="btn-png" src="assets/ui/button_play.png" alt=""
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+        <span class="btn-fallback play-fallback" style="display:none;">▶</span>
+      </button>
+
       <div class="best-row">
-        <div class="best-item"><span class="best-k">BEST</span><span id="titleBest">0</span><span class="m">m</span></div>
-        <div class="best-item"><span class="best-k">MAX LV</span><span id="titleMaxLv">1</span></div>
+        <div class="best-item panel-best-score">
+          <span class="best-k">BEST</span><span id="titleBest">0</span><span class="m">m</span>
+        </div>
+        <div class="best-item panel-best-level">
+          <span class="best-k">MAX LV</span><span id="titleMaxLv">1</span>
+        </div>
       </div>
+
       <div class="how">
-        <div class="how-item"><span class="key">← →</span><span class="key">swipe</span><small>move</small></div>
-        <div class="how-item"><span class="key">↑</span><span class="key">swipe up</span><small>jump</small></div>
+        <div class="how-item"><span class="key">SPACE</span><span class="key">TAP</span><small>jump</small></div>
+        <div class="how-item"><span class="key">↓</span><span class="key">swipe ↓</span><small>slide</small></div>
       </div>
     </div>
   </div>
@@ -53,23 +78,28 @@
   <!-- ===== Game over screen ===== -->
   <div id="over" class="screen hidden">
     <div class="over-card">
-      <div id="overFace" class="over-face"></div>
+      <div class="over-title">GAME OVER</div>
       <div class="over-stats">
-        <div class="stat big"><span id="overDist">0</span><span class="m">m</span></div>
+        <div class="stat big"><span id="overScore">0</span><span class="m">m</span></div>
         <div class="stat-row">
           <div class="stat"><span class="stat-k">LV</span><span id="overLevel">1</span></div>
-          <div class="stat"><span class="cheese"></span><span id="overFood">0</span></div>
+          <div class="stat"><span class="cheese-icon" aria-hidden="true"></span><span id="overCheese">0</span></div>
           <div class="stat"><span class="stat-k">BEST</span><span id="overBest">0</span></div>
         </div>
         <div id="newBest" class="new-best hidden">NEW BEST!</div>
       </div>
 
-      <!-- AD: Continue placeholder. A rewarded ad can revive the player here. -->
-      <button id="continueBtn" class="btn btn-continue hidden">▶▶ Continue</button>
-
       <div class="over-actions">
-        <button id="retryBtn" class="btn btn-retry">↺</button>
-        <a class="btn btn-home" href="../../">⌂</a>
+        <button id="retryBtn" class="btn btn-img" aria-label="Retry">
+          <img class="btn-png" src="assets/ui/button_retry.png" alt=""
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+          <span class="btn-fallback" style="display:none;">↺</span>
+        </button>
+        <a id="homeBtn" class="btn btn-img" href="../../" aria-label="Home">
+          <img class="btn-png" src="assets/ui/button_home.png" alt=""
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+          <span class="btn-fallback" style="display:none;">⌂</span>
+        </a>
       </div>
     </div>
   </div>
