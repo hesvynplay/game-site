@@ -1,6 +1,8 @@
 /* =====================================================================
    Mouse Rush — image-based 2D side-scrolling runner (Canvas 2D, vanilla).
-   Storybook style. Uses PNG assets via drawImage(). No external libs.
+   Storybook style. PNG assets via drawImage(). No external libs.
+   Rules: every obstacle is avoidable by JUMP or SLIDE. No "hand".
+   No unavoidable / screen-blocking obstacles. Hitboxes < sprite size.
    ===================================================================== */
 (() => {
 "use strict";
@@ -25,7 +27,7 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-/* ---------------- asset manifest ---------------- */
+/* ---------------- asset manifest (no hand) ---------------- */
 const A = "assets/";
 const MANIFEST = {
   // player
@@ -36,9 +38,9 @@ const MANIFEST = {
   // items
   cheese:A+"items/cheese.png", crumb:A+"items/breadcrumb.png", seed:A+"items/seed.png",
   sparkle:A+"items/sparkle.png", starburst:A+"items/starburst.png",
-  // enemies
+  // enemies (hand intentionally NOT included)
   trap:A+"enemies/mousetrap.png", cat_gray:A+"enemies/cat_gray.png", cat_black:A+"enemies/cat_black.png",
-  hand:A+"enemies/hand.png", bird_shadow:A+"enemies/bird_shadow.png", bird:A+"enemies/bird_attack.png",
+  bird_shadow:A+"enemies/bird_shadow.png", bird:A+"enemies/bird_attack.png",
   bug_lady:A+"enemies/bug_ladybug.png", bug_pill:A+"enemies/bug_pillbug.png",
   // backgrounds
   kitchen_back:A+"backgrounds/kitchen_back.png", kitchen_mid:A+"backgrounds/kitchen_mid.png",
@@ -83,8 +85,39 @@ const WORLDS = [
 ];
 function worldIndexForLevel(lv){ return Math.floor((lv-1)/10) % WORLDS.length; }
 
+/* ---------------- obstacle catalog ----------------
+   avoidType: "jump"  -> ground hazard, clear by jumping
+              "slide" -> overhead hazard, clear by sliding under
+   drawH = visual height (px*SC). hb* = hitbox (kept smaller than sprite).
+   All jump-heights are below the jump apex (~130*SC) so they ARE clearable.
+   All slide-hazards float above the slide gap so they ARE duck-able.        */
+const OBSTACLE_DEFS = {
+  trap:      { avoidType:"jump",  drawH:46, hbW:46, hbH:30 },
+  bug_lady:  { avoidType:"jump",  drawH:32, hbW:24, hbH:22 },
+  bug_pill:  { avoidType:"jump",  drawH:32, hbW:24, hbH:22 },
+  cat_gray:  { avoidType:"jump",  drawH:70, hbW:58, hbH:50 },
+  cat_black: { avoidType:"jump",  drawH:74, hbW:60, hbH:52 },
+  bird:      { avoidType:"slide", drawH:52, hbW:56, hbH:36 }
+};
+
+/* WORLD_OBSTACLES: weighted pools per world (no hand anywhere) */
+const WORLD_OBSTACLES = [
+  [ {key:"trap",w:8}, {key:"cat_gray",w:1} ],                                   // Kitchen — easy
+  [ {key:"bug_pill",w:8}, {key:"trap",w:2} ],                                   // Sewer — small bugs
+  [ {key:"cat_gray",w:4}, {key:"cat_black",w:3}, {key:"trap",w:3}, {key:"bug_pill",w:2} ], // Back Alley — cats
+  [ {key:"bird",w:6}, {key:"cat_gray",w:3}, {key:"bug_lady",w:3} ]              // City — birds & cats
+];
+function pickObstacleKey(wi){
+  const pool=WORLD_OBSTACLES[wi];
+  let total=0; for(const e of pool) total+=e.w;
+  let r=Math.random()*total;
+  for(const e of pool){ r-=e.w; if(r<=0) return e.key; }
+  return pool[0].key;
+}
+
 /* ---------------- player state ---------------- */
 const RUN_FRAMES = ["m_run1","m_run2","m_run3","m_run4"];
+const JUMP_V = 800*1;   // base jump velocity (scaled below); apex ~ 139px*SC
 let player;
 function resetPlayer(){
   player = { y:0, vy:0, onGround:true, sliding:false, slideT:0, anim:0, animT:0, happyT:0, dustT:0, dead:false };
@@ -97,7 +130,7 @@ let game;
 function newGame(){
   game = {
     scroll:0, speed:300*SC, dist:0, score:0, level:1, cheese:0,
-    spawnT:0.8, itemT:0.6, obstacles:[], items:[], fx:[], dusts:[],
+    spawnT:1.2, itemT:0.9, obstacles:[], items:[], fx:[], dusts:[],
     shake:0, flash:0, worldIdx:0, banner:0
   };
   resetPlayer();
@@ -115,7 +148,7 @@ let retryCount = LS.get("mouseRushRetryCount",0);
 /* ---------------- input handling ---------------- */
 function jump(){
   if(state!==PLAY||player.dead) return;
-  if(player.onGround){ player.vy = -780*SC; player.onGround=false; player.sliding=false; }
+  if(player.onGround){ player.vy = -JUMP_V*SC; player.onGround=false; player.sliding=false; }
 }
 function slide(){
   if(state!==PLAY||player.dead) return;
@@ -130,14 +163,11 @@ let tsX=0,tsY=0,tActive=false,tHandled=false;
 function ps(x,y){ tsX=x;tsY=y;tActive=true;tHandled=false; }
 function pm(x,y){
   if(!tActive||tHandled) return;
-  const dx=x-tsX, dy=y-tsY;
+  const dy=y-tsY;
   if(dy<-40){ jump(); tHandled=true; }
   else if(dy>40){ slide(); tHandled=true; }
 }
-function pe(){
-  if(tActive && !tHandled){ jump(); } // simple tap = jump
-  tActive=false;
-}
+function pe(){ if(tActive && !tHandled) jump(); tActive=false; } // tap = jump
 canvas.addEventListener("touchstart",(e)=>{const t=e.changedTouches[0];ps(t.clientX,t.clientY);e.preventDefault();},{passive:false});
 canvas.addEventListener("touchmove",(e)=>{const t=e.changedTouches[0];pm(t.clientX,t.clientY);e.preventDefault();},{passive:false});
 canvas.addEventListener("touchend",(e)=>{pe();e.preventDefault();},{passive:false});
@@ -147,36 +177,42 @@ window.addEventListener("mouseup",()=>pe());
 $("playBtn").addEventListener("click", startPlay);
 $("retryBtn").addEventListener("click", startPlay);
 
+/* ---------------- spacing / safety helpers ---------------- */
+// keep a clear gap so the player always has a reachable safe route
+function reactionGap(){ return Math.max(240*SC, game.speed*0.78); }
+function spaceFree(x, pad){
+  for(const o of game.obstacles){ if(Math.abs(o.x - x) < pad + o.drawW*0.5) return false; }
+  for(const it of game.items){ if(Math.abs(it.x - x) < pad + it.r) return false; }
+  return true;
+}
+
 /* ---------------- obstacle spawning ---------------- */
-// type: "jump" (ground hazard, must JUMP) | "slide" (overhead hazard, must SLIDE)
 function spawnObstacle(){
-  const lv=game.level, wi=game.worldIdx;
-  // pool weighted by world + level
-  let pool=[];
-  pool.push({key:"trap",type:"jump",h:42,w:64});
-  pool.push({key:(Math.random()<0.5?"bug_lady":"bug_pill"),type:"jump",h:30,w:36});
-  if(lv>=4||wi>=1) pool.push({key:"hand",type:"slide",h:120,w:70});
-  if(lv>=6||wi>=2) pool.push({key:"bird",type:"slide",h:60,w:84});
-  if(lv>=8||wi>=3) pool.push({key:(Math.random()<0.5?"cat_gray":"cat_black"),type:"jump",h:72,w:92});
-  // world flavor
-  if(wi===0) pool.push({key:"trap",type:"jump",h:42,w:64});
-  if(wi===1) pool.push({key:"bug_pill",type:"jump",h:30,w:36});
-  if(wi===3 && lv>=8) pool.push({key:(Math.random()<0.5?"cat_gray":"cat_black"),type:"jump",h:72,w:92});
-  const o = pool[(Math.random()*pool.length)|0];
-  const ob = { key:o.key, type:o.type, w:o.w*SC, h:o.h*SC, x:W+60*SC, passed:false };
-  if(o.type==="jump"){ ob.footY=groundY; }                      // sits on ground
-  else { ob.footY=groundY - 52*SC; }                            // overhead: leaves a low gap to slide under
+  const spawnX = W + 70*SC;
+  // guarantee spacing so no unavoidable back-to-back combo can occur
+  if(!spaceFree(spawnX, reactionGap())) return;
+  const key = pickObstacleKey(game.worldIdx);
+  const def = OBSTACLE_DEFS[key];
+  if(!def || (def.avoidType!=="jump" && def.avoidType!=="slide")) return; // safety: only jump/slide
+  const drawH = def.drawH*SC, hbW = def.hbW*SC, hbH = def.hbH*SC;
+  const drawW = drawH; // aspect fixed at draw time from the image; this is a spacing proxy
+  const ob = {
+    key, avoidType:def.avoidType, drawH, drawW, hbW, hbH, x:spawnX,
+    footY: def.avoidType==="jump" ? groundY : groundY - 54*SC,  // overhead floats above the slide gap
+    shadow: (key==="bird")
+  };
   game.obstacles.push(ob);
-  if(o.key==="bird"){ ob.shadow=true; }
 }
 
 /* ---------------- item spawning ---------------- */
 function spawnItem(){
+  const spawnX = W + 70*SC;
+  if(!spaceFree(spawnX, 80*SC)) return;        // never overlap an obstacle
   const r=Math.random();
-  const key = r<0.78?"cheese":(r<0.9?"crumb":"seed");
-  const high = Math.random()<0.4;                                // some cheese up high (jump to grab)
-  const footY = high ? groundY - (110+Math.random()*40)*SC : groundY - (8+Math.random()*10)*SC;
-  game.items.push({ key, x:W+60*SC, footY, r:18*SC, taken:false });
+  const key = r<0.8?"cheese":(r<0.92?"crumb":"seed");
+  const high = Math.random()<0.32;             // some cheese up high (reachable by jump apex)
+  const footY = high ? groundY - (96+Math.random()*28)*SC : groundY - (8+Math.random()*8)*SC;
+  game.items.push({ key, x:spawnX, footY, r:18*SC, taken:false });
 }
 
 /* ---------------- particles / effects ---------------- */
@@ -185,21 +221,16 @@ function addDust(){ game.dusts.push({x:mouseX-26*SC, y:groundY, t:1}); }
 
 /* ---------------- flow ---------------- */
 function startPlay(){
-  newGame();
-  state=PLAY;
-  $("title").classList.add("hidden");
-  $("over").classList.add("hidden");
-  $("loading").classList.add("hidden");
-  $("hud").classList.remove("hidden");
+  newGame(); state=PLAY;
+  $("title").classList.add("hidden"); $("over").classList.add("hidden");
+  $("loading").classList.add("hidden"); $("hud").classList.remove("hidden");
 }
 function showTitle(){
   state=TITLE;
   $("titleBest").textContent=Math.floor(bestScore);
   $("titleMaxLv").textContent=bestLevel;
-  $("loading").classList.add("hidden");
-  $("title").classList.remove("hidden");
-  $("hud").classList.add("hidden");
-  $("over").classList.add("hidden");
+  $("loading").classList.add("hidden"); $("title").classList.remove("hidden");
+  $("hud").classList.add("hidden"); $("over").classList.add("hidden");
 }
 function gameOver(){
   if(state!==PLAY) return;
@@ -219,10 +250,13 @@ function gameOver(){
 
 /* ---------------- collision detection ---------------- */
 function mouseBox(){
-  const mw=42*SC;
+  const mw=40*SC;
   if(player.sliding){ return { x:mouseX-mw/2, y:groundY-40*SC, w:mw, h:40*SC }; }
-  const mh=78*SC;
+  const mh=76*SC;
   return { x:mouseX-mw/2, y:groundY - mh + player.y, w:mw, h:mh };
+}
+function obstacleBox(o){
+  return { x:o.x-o.hbW/2, y:o.footY-o.hbH, w:o.hbW, h:o.hbH };
 }
 function hit(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
 
@@ -230,13 +264,12 @@ function hit(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b
 let last=0;
 function update(dt){
   if(state!==PLAY) return;
-  // difficulty scales with level
   game.speed = (300 + game.level*16)*SC;
   game.scroll += game.speed*dt;
   game.dist += game.speed*dt;
   game.score += game.speed*dt*0.05;
 
-  // level / world
+  // level / world (first ~1400px = level 1, then ramps)
   const lv = 1 + Math.floor(game.dist/(1400*SC));
   if(lv>game.level){
     const pw=game.worldIdx;
@@ -252,26 +285,21 @@ function update(dt){
   }
   if(player.sliding){ player.slideT-=dt; if(player.slideT<=0) player.sliding=false; }
   if(player.happyT>0) player.happyT-=dt;
-  // run animation
   player.animT+=dt;
   const frameDur=Math.max(0.05, 0.12 - game.level*0.002);
   if(player.animT>=frameDur){ player.animT=0; player.anim=(player.anim+1)%RUN_FRAMES.length; }
-  // dust
   if(player.onGround && !player.sliding){ player.dustT-=dt; if(player.dustT<=0){ addDust(); player.dustT=0.16; } }
 
-  // spawn obstacles & items
+  // spawn (easy start: long gaps early, tighten with level but spacing-guarded)
   game.spawnT-=dt;
-  if(game.spawnT<=0){ spawnObstacle(); game.spawnT = Math.max(0.55, 1.15 - game.level*0.02)*(0.75+Math.random()*0.6); }
+  if(game.spawnT<=0){ spawnObstacle(); game.spawnT = Math.max(0.7, 1.5 - game.level*0.02)*(0.8+Math.random()*0.5); }
   game.itemT-=dt;
-  if(game.itemT<=0){ spawnItem(); game.itemT = (0.5+Math.random()*0.7); }
+  if(game.itemT<=0){ spawnItem(); game.itemT = (0.55+Math.random()*0.7); }
 
   // move + collide obstacles
-  for(const o of game.obstacles){ o.x -= game.speed*dt; }
   const mb=mouseBox();
-  for(const o of game.obstacles){
-    const ob={ x:o.x-o.w/2, y:o.footY-o.h, w:o.w, h:o.h };
-    if(hit(mb,ob)){ player.expr="surprised"; gameOver(); break; }
-  }
+  for(const o of game.obstacles){ o.x -= game.speed*dt; }
+  for(const o of game.obstacles){ if(hit(mb,obstacleBox(o))){ gameOver(); break; } }
   game.obstacles = game.obstacles.filter(o=>o.x>-120*SC);
 
   // move + collect items
@@ -281,8 +309,7 @@ function update(dt){
     const ib={ x:it.x-it.r, y:it.footY-it.r, w:it.r*2, h:it.r*2 };
     if(hit(mb,ib)){
       it.taken=true;
-      game.cheese += (it.key==="cheese")?1:0;
-      game.score += (it.key==="cheese")?12:6;
+      if(it.key==="cheese"){ game.cheese++; game.score+=12; } else { game.score+=6; }
       player.happyT=0.5;
       addFX(Math.random()<0.5?"sparkle":"starburst", it.x, it.footY-it.r);
     }
@@ -315,11 +342,8 @@ function drawTiled(key, factor, drawY, drawH, fbColor){
     const tw = drawH*aspect;
     let start = -((off % tw)+tw)%tw;
     for(let x=start; x<W+tw; x+=tw){ ctx.drawImage(img, x, drawY, tw, drawH); }
-  } else if(fbColor){
-    ctx.fillStyle=fbColor; ctx.fillRect(0,drawY,W,drawH);
-  }
+  } else if(fbColor){ ctx.fillStyle=fbColor; ctx.fillRect(0,drawY,W,drawH); }
 }
-// draw a sprite anchored by horizontal-center and bottom (feet)
 function drawSprite(key, cx, footY, targetH, fb){
   const img=getImg(key);
   if(img){
@@ -335,9 +359,7 @@ function render(){
   if(game && game.shake>0.4){ ctx.translate((Math.random()-0.5)*game.shake,(Math.random()-0.5)*game.shake); }
   const w = WORLDS[game?game.worldIdx:0];
 
-  // sky base
   ctx.fillStyle=w.sky; ctx.fillRect(-40,-40,W+80,H+80);
-  // parallax: back / mid / front (full-height covers), ground (bottom strip)
   drawTiled(w.back, 0.15, 0, H, w.sky);
   drawTiled(w.mid, 0.35, H*0.12, H*0.78, null);
   drawTiled(w.front, 0.6, H*0.30, H*0.62, null);
@@ -348,12 +370,12 @@ function render(){
     for(const it of game.items){
       drawSprite(it.key, it.x, it.footY+it.r, it.r*2.2, (cx,fy,h)=>{ ctx.fillStyle="#ffd21f"; ctx.beginPath(); ctx.arc(cx,fy-h/2,h*0.4,0,6.28); ctx.fill(); });
     }
-    // obstacles (+ bird shadow telegraph, diegetic — not a UI warning)
+    // obstacles (bird shows a diegetic ground shadow — not a UI warning)
     for(const o of game.obstacles){
       if(o.shadow){ drawSprite("bird_shadow", o.x, groundY+2*SC, 16*SC, null); }
-      drawSprite(o.key, o.x, o.footY, o.h, (cx,fy,h)=>{
-        ctx.fillStyle=(o.type==="jump")?"#c46": "#7a6"; // tasteful fallback silhouette only if PNG missing
-        const ww=o.w; ctx.beginPath(); ctx.moveTo(cx-ww/2,fy); ctx.lineTo(cx-ww/2,fy-h); ctx.lineTo(cx+ww/2,fy-h); ctx.lineTo(cx+ww/2,fy); ctx.closePath(); ctx.fill();
+      drawSprite(o.key, o.x, o.footY, o.drawH, (cx,fy,h)=>{
+        ctx.fillStyle=(o.avoidType==="jump")?"#c8607a":"#7aa06a";
+        ctx.beginPath(); ctx.ellipse(cx,fy-h*0.5,h*0.42,h*0.5,0,0,6.28); ctx.fill();
       });
     }
     // player shadow
@@ -362,11 +384,11 @@ function render(){
     if(sh){ const aw=70*SC*shScale, ah=aw*(sh.naturalHeight/sh.naturalWidth); ctx.globalAlpha=0.5*shScale; ctx.drawImage(sh, mouseX-aw/2, groundY-ah*0.4, aw, ah); ctx.globalAlpha=1; }
     else { ctx.globalAlpha=0.22*shScale; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(mouseX,groundY,30*SC*shScale,8*SC*shScale,0,0,6.28); ctx.fill(); ctx.globalAlpha=1; }
 
-    // dust puffs (behind/under feet)
+    // dust
     for(const d of game.dusts){ ctx.globalAlpha=Math.max(0,d.t)*0.8; drawSprite("dust", d.x, d.y, 26*SC, (cx,fy,h)=>{ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(cx,fy-h/2,h*0.4,0,6.28);ctx.fill();}); }
     ctx.globalAlpha=1;
 
-    // player sprite by state
+    // player
     let key="m_run1";
     if(player.dead) key="m_over";
     else if(!player.onGround) key="m_jump";
@@ -391,7 +413,6 @@ function render(){
       ctx.fillText(WORLDS[game.worldIdx].name, W/2, H*0.45);
       ctx.globalAlpha=1; ctx.textAlign="start";
     }
-    // death flash
     if(game.flash>0.02){ ctx.globalAlpha=game.flash*0.4; ctx.fillStyle="#ff2b2b"; ctx.fillRect(-40,-40,W+80,H+80); ctx.globalAlpha=1; }
   }
   ctx.restore();
@@ -400,8 +421,7 @@ function render(){
 /* ---------------- main loop ---------------- */
 function frame(ts){
   const dt=Math.min(0.05,(ts-last)/1000)||0.016; last=ts;
-  update(dt);
-  render();
+  update(dt); render();
   requestAnimationFrame(frame);
 }
 
