@@ -4,57 +4,101 @@
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #111;
-  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(circle at top, #222 0%, #0f0f12 45%, #050506 100%);
+  color: #f5f5f5;
+  line-height: 1.7;
 }
 
 .container {
-  max-width: 900px;
+  width: min(920px, 92%);
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 56px 0;
+  text-align: center;
+}
+
+.page-card {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 24px;
+  padding: 42px 34px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
 }
 
 h1 {
-  font-size: 48px;
-  margin-bottom: 10px;
+  font-size: clamp(34px, 5vw, 56px);
+  margin: 0 0 12px;
+  letter-spacing: -0.04em;
 }
 
-p {
-  color: #ccc;
+h2 {
+  margin-top: 42px;
+  margin-bottom: 12px;
+  font-size: 22px;
+  color: #ffffff;
 }
 
-.games {
-  margin-top: 40px;
+p, li {
+  color: #cfcfd6;
+  font-size: 16px;
+}
+
+ul {
+  text-align: left;
+  display: inline-block;
+  max-width: 720px;
+  padding-left: 22px;
+}
+
+a {
+  color: #ffffff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,0.35);
+}
+
+a:hover {
+  opacity: 0.75;
+}
+
+.nav {
+  margin-bottom: 28px;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.nav a {
+  color: #bdbdc7;
+  font-size: 14px;
+  border-bottom: none;
+}
+
+.footer-note {
+  margin-top: 38px;
+  font-size: 13px;
+  color: #8c8c96;
 }
 
 .game-card {
   display: block;
+  max-width: 520px;
+  margin: 24px auto;
   padding: 24px;
-  margin: 16px 0;
-  border-radius: 16px;
-  background: #222;
-  color: white;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
   text-decoration: none;
 }
 
 .game-card:hover {
-  background: #333;
+  background: rgba(255,255,255,0.13);
 }
 
 .game-card span {
   display: block;
   margin-top: 8px;
-  opacity: 0.7;
-}
-
-footer {
-  margin-top: 60px;
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-footer a {
-  color: #aaa;
+  color: #aaaab3;
 }
