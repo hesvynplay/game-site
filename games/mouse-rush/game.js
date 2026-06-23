@@ -1,8 +1,8 @@
 /* =====================================================================
    Mouse Rush — image-based 2D side-scrolling runner (Canvas 2D, vanilla).
-   Storybook style. PNG assets via drawImage(). No external libs.
-   Rules: every obstacle is avoidable by JUMP or SLIDE. No "hand".
-   No unavoidable / screen-blocking obstacles. Hitboxes < sprite size.
+   Single field (main_background.png + main_ground.png). Cheese is the
+   only collectible. Every obstacle avoidable by JUMP or SLIDE.
+   Difficulty ramps gently then meaningfully; never unfair.
    ===================================================================== */
 (() => {
 "use strict";
@@ -12,6 +12,7 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = true;
 const $ = (id) => document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 
 let W=0,H=0,DPR=1,SC=1,groundY=0,mouseX=0;
 function resize(){
@@ -27,7 +28,7 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-/* ---------------- asset manifest (no hand) ---------------- */
+/* ---------------- asset manifest (single field, cheese only) ---------------- */
 const A = "assets/";
 const MANIFEST = {
   // player
@@ -35,22 +36,14 @@ const MANIFEST = {
   m_run3:A+"player/mouse_run_03.png", m_run4:A+"player/mouse_run_04.png", m_jump:A+"player/mouse_jump.png",
   m_slide:A+"player/mouse_slide.png", m_happy:A+"player/mouse_happy.png", m_surprised:A+"player/mouse_surprised.png",
   m_over:A+"player/mouse_gameover.png", m_shadow:A+"player/mouse_shadow.png", dust:A+"player/dust_puff.png",
-  // items
-  cheese:A+"items/cheese.png", crumb:A+"items/breadcrumb.png", seed:A+"items/seed.png",
-  sparkle:A+"items/sparkle.png", starburst:A+"items/starburst.png",
-  // enemies (hand intentionally NOT included)
+  // items (cheese is the only collectible; sparkle/starburst are pickup FX)
+  cheese:A+"items/cheese.png", sparkle:A+"items/sparkle.png", starburst:A+"items/starburst.png",
+  // enemies (no hand)
   trap:A+"enemies/mousetrap.png", cat_gray:A+"enemies/cat_gray.png", cat_black:A+"enemies/cat_black.png",
   bird_shadow:A+"enemies/bird_shadow.png", bird:A+"enemies/bird_attack.png",
   bug_lady:A+"enemies/bug_ladybug.png", bug_pill:A+"enemies/bug_pillbug.png",
-  // backgrounds
-  kitchen_back:A+"backgrounds/kitchen_back.png", kitchen_mid:A+"backgrounds/kitchen_mid.png",
-  kitchen_front:A+"backgrounds/kitchen_front.png", kitchen_ground:A+"backgrounds/kitchen_ground.png",
-  sewer_back:A+"backgrounds/sewer_back.png", sewer_mid:A+"backgrounds/sewer_mid.png",
-  sewer_front:A+"backgrounds/sewer_front.png", sewer_ground:A+"backgrounds/sewer_ground.png",
-  alley_back:A+"backgrounds/alley_back.png", alley_mid:A+"backgrounds/alley_mid.png",
-  alley_front:A+"backgrounds/alley_front.png", alley_ground:A+"backgrounds/alley_ground.png",
-  city_back:A+"backgrounds/city_back.png", city_mid:A+"backgrounds/city_mid.png",
-  city_front:A+"backgrounds/city_front.png", city_ground:A+"backgrounds/city_ground.png"
+  // single background field
+  main_bg:A+"backgrounds/main_background.png", main_ground:A+"backgrounds/main_ground.png"
 };
 const IMG = {};
 function getImg(k){ const i=IMG[k]; return (i && i.ok) ? i.img : null; }
@@ -76,21 +69,13 @@ function preloadAssets(done){
   }
 }
 
-/* ---------------- world definitions ---------------- */
-const WORLDS = [
-  { name:"Kitchen",     back:"kitchen_back", mid:"kitchen_mid", front:"kitchen_front", ground:"kitchen_ground", sky:"#ffe7bd", fb:"#e9c79a" },
-  { name:"Sewer",       back:"sewer_back",   mid:"sewer_mid",   front:"sewer_front",   ground:"sewer_ground",   sky:"#16302c", fb:"#214741" },
-  { name:"Back Alley",  back:"alley_back",   mid:"alley_mid",   front:"alley_front",   ground:"alley_ground",   sky:"#3b3242", fb:"#544c5e" },
-  { name:"City Street", back:"city_back",    mid:"city_mid",    front:"city_front",    ground:"city_ground",    sky:"#bcd2e8", fb:"#6c6c74" }
-];
-function worldIndexForLevel(lv){ return Math.floor((lv-1)/10) % WORLDS.length; }
+/* ---------------- field (single, fixed) ---------------- */
+const FIELD = { name:"Kitchen", skyFallback:"#ffe7bd", groundFallback:"#e3c391" };
 
 /* ---------------- obstacle catalog ----------------
-   avoidType: "jump"  -> ground hazard, clear by jumping
-              "slide" -> overhead hazard, clear by sliding under
-   drawH = visual height (px*SC). hb* = hitbox (kept smaller than sprite).
-   All jump-heights are below the jump apex (~130*SC) so they ARE clearable.
-   All slide-hazards float above the slide gap so they ARE duck-able.        */
+   avoidType "jump"  -> ground hazard, clear by jumping
+             "slide" -> overhead hazard (floats above slide gap), duck under
+   Hitboxes (hb*) are smaller than the sprite; all jump heights < jump apex. */
 const OBSTACLE_DEFS = {
   trap:      { avoidType:"jump",  drawH:46, hbW:46, hbH:30 },
   bug_lady:  { avoidType:"jump",  drawH:32, hbW:24, hbH:22 },
@@ -99,25 +84,42 @@ const OBSTACLE_DEFS = {
   cat_black: { avoidType:"jump",  drawH:74, hbW:60, hbH:52 },
   bird:      { avoidType:"slide", drawH:52, hbW:56, hbH:36 }
 };
-
-/* WORLD_OBSTACLES: weighted pools per world (no hand anywhere) */
-const WORLD_OBSTACLES = [
-  [ {key:"trap",w:8}, {key:"cat_gray",w:1} ],                                   // Kitchen — easy
-  [ {key:"bug_pill",w:8}, {key:"trap",w:2} ],                                   // Sewer — small bugs
-  [ {key:"cat_gray",w:4}, {key:"cat_black",w:3}, {key:"trap",w:3}, {key:"bug_pill",w:2} ], // Back Alley — cats
-  [ {key:"bird",w:6}, {key:"cat_gray",w:3}, {key:"bug_lady",w:3} ]              // City — birds & cats
-];
-function pickObstacleKey(wi){
-  const pool=WORLD_OBSTACLES[wi];
+function weighted(pool){
   let total=0; for(const e of pool) total+=e.w;
   let r=Math.random()*total;
   for(const e of pool){ r-=e.w; if(r<=0) return e.key; }
   return pool[0].key;
 }
+function pickJumpKey(L){
+  const pool=[{key:"trap",w:7},{key:"bug_pill",w:3},{key:"bug_lady",w:3}];
+  if(L>=8) pool.push({key:"cat_gray",w:3});
+  if(L>=13) pool.push({key:"cat_black",w:3});
+  return weighted(pool);
+}
+
+/* ---------------- difficulty curve (all tunables in one place) ----------------
+   Speed is NOT the only lever — spacing, type mix, doubles and cheese risk
+   shape the challenge. Everything stays inside avoidable, fair bounds.       */
+function difficulty(L){
+  const gameSpeed = (250 + Math.min(L,20)*16 + Math.max(0,L-20)*5) * SC;
+  const reactionSec = clamp(1.15 - L*0.012, 0.80, 1.15);   // always >= jump airtime => safe landing
+  const minObstacleGap = gameSpeed * reactionSec;
+  const maxObstacleGap = minObstacleGap * 1.9;
+  return {
+    gameSpeed,
+    obstacleSpawnInterval: clamp(1.70 - L*0.05, 0.62, 1.70),
+    cheeseSpawnInterval:   clamp(1.10 - L*0.03, 0.60, 1.10),
+    minObstacleGap, maxObstacleGap,
+    slideObstacleRate: clamp((L-7)*0.05, 0, 0.40),          // slides introduced ~L8
+    jumpObstacleRate:  1 - clamp((L-7)*0.05, 0, 0.40),
+    doublePatternRate: clamp((L-3)*0.04, 0, 0.45),          // bursts of 2 (same jump type) from ~L4
+    cheeseRiskRate:    clamp((L-1)*0.03, 0, 0.50)           // more high/risky cheese later
+  };
+}
 
 /* ---------------- player state ---------------- */
 const RUN_FRAMES = ["m_run1","m_run2","m_run3","m_run4"];
-const JUMP_V = 800*1;   // base jump velocity (scaled below); apex ~ 139px*SC
+const JUMP_V = 800;  // *SC applied at use; apex ~139*SC
 let player;
 function resetPlayer(){
   player = { y:0, vy:0, onGround:true, sliding:false, slideT:0, anim:0, animT:0, happyT:0, dustT:0, dead:false };
@@ -129,9 +131,10 @@ let state = LOAD;
 let game;
 function newGame(){
   game = {
-    scroll:0, speed:300*SC, dist:0, score:0, level:1, cheese:0,
-    spawnT:1.2, itemT:0.9, obstacles:[], items:[], fx:[], dusts:[],
-    shake:0, flash:0, worldIdx:0, banner:0
+    scroll:0, dist:0, score:0, level:1, cheese:0,
+    speed:250*SC, obstacleT:1.3, cheeseT:1.0,
+    obstacles:[], items:[], fx:[], dusts:[],
+    shake:0, flash:0, banner:0
   };
   resetPlayer();
 }
@@ -167,7 +170,7 @@ function pm(x,y){
   if(dy<-40){ jump(); tHandled=true; }
   else if(dy>40){ slide(); tHandled=true; }
 }
-function pe(){ if(tActive && !tHandled) jump(); tActive=false; } // tap = jump
+function pe(){ if(tActive && !tHandled) jump(); tActive=false; }
 canvas.addEventListener("touchstart",(e)=>{const t=e.changedTouches[0];ps(t.clientX,t.clientY);e.preventDefault();},{passive:false});
 canvas.addEventListener("touchmove",(e)=>{const t=e.changedTouches[0];pm(t.clientX,t.clientY);e.preventDefault();},{passive:false});
 canvas.addEventListener("touchend",(e)=>{pe();e.preventDefault();},{passive:false});
@@ -177,9 +180,12 @@ window.addEventListener("mouseup",()=>pe());
 $("playBtn").addEventListener("click", startPlay);
 $("retryBtn").addEventListener("click", startPlay);
 
-/* ---------------- spacing / safety helpers ---------------- */
-// keep a clear gap so the player always has a reachable safe route
-function reactionGap(){ return Math.max(240*SC, game.speed*0.78); }
+/* ---------------- spacing / safety ---------------- */
+function rightmostObstacleX(){
+  let mx=-Infinity;
+  for(const o of game.obstacles){ const r=o.x+o.drawW*0.5; if(r>mx) mx=r; }
+  return mx;
+}
 function spaceFree(x, pad){
   for(const o of game.obstacles){ if(Math.abs(o.x - x) < pad + o.drawW*0.5) return false; }
   for(const it of game.items){ if(Math.abs(it.x - x) < pad + it.r) return false; }
@@ -187,32 +193,43 @@ function spaceFree(x, pad){
 }
 
 /* ---------------- obstacle spawning ---------------- */
-function spawnObstacle(){
-  const spawnX = W + 70*SC;
-  // guarantee spacing so no unavoidable back-to-back combo can occur
-  if(!spaceFree(spawnX, reactionGap())) return;
-  const key = pickObstacleKey(game.worldIdx);
-  const def = OBSTACLE_DEFS[key];
-  if(!def || (def.avoidType!=="jump" && def.avoidType!=="slide")) return; // safety: only jump/slide
-  const drawH = def.drawH*SC, hbW = def.hbW*SC, hbH = def.hbH*SC;
-  const drawW = drawH; // aspect fixed at draw time from the image; this is a spacing proxy
-  const ob = {
-    key, avoidType:def.avoidType, drawH, drawW, hbW, hbH, x:spawnX,
-    footY: def.avoidType==="jump" ? groundY : groundY - 54*SC,  // overhead floats above the slide gap
+function makeObstacle(key, x){
+  const def=OBSTACLE_DEFS[key];
+  const drawH=def.drawH*SC, hbW=def.hbW*SC, hbH=def.hbH*SC;
+  return {
+    key, avoidType:def.avoidType, drawH, drawW:drawH, hbW, hbH, x,
+    footY: def.avoidType==="jump" ? groundY : groundY - 54*SC,
     shadow: (key==="bird")
   };
-  game.obstacles.push(ob);
+}
+function spawnObstacle(D){
+  const spawnX = W + 70*SC;
+  // never violate the safe gap from the previous obstacle
+  if(rightmostObstacleX() > spawnX - D.minObstacleGap) return;
+  if(!spaceFree(spawnX, 80*SC)) return; // keep clear of cheese too
+
+  const useSlide = Math.random() < D.slideObstacleRate;
+  if(useSlide){
+    game.obstacles.push(makeObstacle("bird", spawnX));
+    return;
+  }
+  // jump type — possibly a fair "double" burst (same type, spaced to land between)
+  const key = pickJumpKey(game.level);
+  game.obstacles.push(makeObstacle(key, spawnX));
+  if(Math.random() < D.doublePatternRate){
+    const gap = D.minObstacleGap * (1.0 + Math.random()*0.25);
+    const x2 = spawnX + gap;
+    if(spaceFree(x2, 60*SC)) game.obstacles.push(makeObstacle(key, x2));
+  }
 }
 
-/* ---------------- item spawning ---------------- */
-function spawnItem(){
+/* ---------------- cheese spawning (only collectible) ---------------- */
+function spawnCheese(D){
   const spawnX = W + 70*SC;
-  if(!spaceFree(spawnX, 80*SC)) return;        // never overlap an obstacle
-  const r=Math.random();
-  const key = r<0.8?"cheese":(r<0.92?"crumb":"seed");
-  const high = Math.random()<0.32;             // some cheese up high (reachable by jump apex)
-  const footY = high ? groundY - (96+Math.random()*28)*SC : groundY - (8+Math.random()*8)*SC;
-  game.items.push({ key, x:spawnX, footY, r:18*SC, taken:false });
+  if(!spaceFree(spawnX, 90*SC)) return;             // cheese NEVER overlaps an obstacle
+  const risky = Math.random() < D.cheeseRiskRate;   // high cheese => must choose to jump for it
+  const footY = risky ? groundY - (96+Math.random()*30)*SC : groundY - (8+Math.random()*8)*SC;
+  game.items.push({ key:"cheese", x:spawnX, footY, r:18*SC, taken:false });
 }
 
 /* ---------------- particles / effects ---------------- */
@@ -222,6 +239,7 @@ function addDust(){ game.dusts.push({x:mouseX-26*SC, y:groundY, t:1}); }
 /* ---------------- flow ---------------- */
 function startPlay(){
   newGame(); state=PLAY;
+  $("hudWorld").textContent = FIELD.name; // fixed label, no world switching
   $("title").classList.add("hidden"); $("over").classList.add("hidden");
   $("loading").classList.add("hidden"); $("hud").classList.remove("hidden");
 }
@@ -255,27 +273,22 @@ function mouseBox(){
   const mh=76*SC;
   return { x:mouseX-mw/2, y:groundY - mh + player.y, w:mw, h:mh };
 }
-function obstacleBox(o){
-  return { x:o.x-o.hbW/2, y:o.footY-o.hbH, w:o.hbW, h:o.hbH };
-}
+function obstacleBox(o){ return { x:o.x-o.hbW/2, y:o.footY-o.hbH, w:o.hbW, h:o.hbH }; }
 function hit(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
 
 /* ---------------- update loop ---------------- */
 let last=0;
 function update(dt){
   if(state!==PLAY) return;
-  game.speed = (300 + game.level*16)*SC;
+  const D = difficulty(game.level);
+  game.speed = D.gameSpeed;
   game.scroll += game.speed*dt;
   game.dist += game.speed*dt;
   game.score += game.speed*dt*0.05;
 
-  // level / world (first ~1400px = level 1, then ramps)
-  const lv = 1 + Math.floor(game.dist/(1400*SC));
-  if(lv>game.level){
-    const pw=game.worldIdx;
-    game.level=lv; game.worldIdx=worldIndexForLevel(lv);
-    if(game.worldIdx!==pw){ game.banner=1.6; game.flash=Math.max(game.flash,0.5); }
-  }
+  // level up (no world change — background stays the same)
+  const lv = 1 + Math.floor(game.dist/(1300*SC));
+  if(lv>game.level){ game.level=lv; game.banner=1.3; }
 
   // player physics
   if(!player.onGround){
@@ -290,11 +303,11 @@ function update(dt){
   if(player.animT>=frameDur){ player.animT=0; player.anim=(player.anim+1)%RUN_FRAMES.length; }
   if(player.onGround && !player.sliding){ player.dustT-=dt; if(player.dustT<=0){ addDust(); player.dustT=0.16; } }
 
-  // spawn (easy start: long gaps early, tighten with level but spacing-guarded)
-  game.spawnT-=dt;
-  if(game.spawnT<=0){ spawnObstacle(); game.spawnT = Math.max(0.7, 1.5 - game.level*0.02)*(0.8+Math.random()*0.5); }
-  game.itemT-=dt;
-  if(game.itemT<=0){ spawnItem(); game.itemT = (0.55+Math.random()*0.7); }
+  // spawn (timers gate frequency; spacing gates fairness)
+  game.obstacleT-=dt;
+  if(game.obstacleT<=0){ spawnObstacle(D); game.obstacleT = D.obstacleSpawnInterval*(0.85+Math.random()*0.4); }
+  game.cheeseT-=dt;
+  if(game.cheeseT<=0){ spawnCheese(D); game.cheeseT = D.cheeseSpawnInterval*(0.85+Math.random()*0.4); }
 
   // move + collide obstacles
   const mb=mouseBox();
@@ -302,25 +315,21 @@ function update(dt){
   for(const o of game.obstacles){ if(hit(mb,obstacleBox(o))){ gameOver(); break; } }
   game.obstacles = game.obstacles.filter(o=>o.x>-120*SC);
 
-  // move + collect items
+  // move + collect cheese
   for(const it of game.items){ it.x -= game.speed*dt; }
   for(const it of game.items){
     if(it.taken) continue;
     const ib={ x:it.x-it.r, y:it.footY-it.r, w:it.r*2, h:it.r*2 };
     if(hit(mb,ib)){
-      it.taken=true;
-      if(it.key==="cheese"){ game.cheese++; game.score+=12; } else { game.score+=6; }
-      player.happyT=0.5;
+      it.taken=true; game.cheese++; game.score+=12; player.happyT=0.5;
       addFX(Math.random()<0.5?"sparkle":"starburst", it.x, it.footY-it.r);
     }
   }
   game.items = game.items.filter(it=>!it.taken && it.x>-80*SC);
 
   // fx & dust
-  for(const f of game.fx){ f.t-=dt*2.2; }
-  game.fx = game.fx.filter(f=>f.t>0);
-  for(const d of game.dusts){ d.t-=dt*2.6; d.x-=game.speed*dt; }
-  game.dusts = game.dusts.filter(d=>d.t>0);
+  for(const f of game.fx){ f.t-=dt*2.2; } game.fx = game.fx.filter(f=>f.t>0);
+  for(const d of game.dusts){ d.t-=dt*2.6; d.x-=game.speed*dt; } game.dusts = game.dusts.filter(d=>d.t>0);
 
   if(game.shake>0) game.shake*=0.86;
   if(game.flash>0) game.flash-=dt*1.6;
@@ -329,7 +338,6 @@ function update(dt){
   // HUD
   $("hudScore").textContent=Math.floor(game.score);
   $("hudLevel").textContent=game.level;
-  $("hudWorld").textContent=WORLDS[game.worldIdx].name;
   $("hudCheese").textContent=game.cheese;
 }
 
@@ -357,20 +365,36 @@ function drawSprite(key, cx, footY, targetH, fb){
 function render(){
   ctx.save();
   if(game && game.shake>0.4){ ctx.translate((Math.random()-0.5)*game.shake,(Math.random()-0.5)*game.shake); }
-  const w = WORLDS[game?game.worldIdx:0];
 
-  ctx.fillStyle=w.sky; ctx.fillRect(-40,-40,W+80,H+80);
-  drawTiled(w.back, 0.15, 0, H, w.sky);
-  drawTiled(w.mid, 0.35, H*0.12, H*0.78, null);
-  drawTiled(w.front, 0.6, H*0.30, H*0.62, null);
-  drawTiled(w.ground, 1.0, groundY-6*SC, H-groundY+6*SC, w.fb);
+  // opaque base so transparency never shows through the playfield
+  ctx.fillStyle=FIELD.skyFallback; ctx.fillRect(0,0,W,H);
+
+  // single background image: full-height cover, drifting very slowly
+  const bg=getImg("main_bg");
+  if(bg){
+    const aspect=bg.naturalWidth/bg.naturalHeight;
+    const dh=H, dw=dh*aspect;
+    const off=((game?game.scroll:last*0.05)*0.12);
+    let start=-((off % dw)+dw)%dw;
+    for(let x=start; x<W+dw; x+=dw){ ctx.drawImage(bg, x, 0, dw, dh); }
+  }
+
+  // OPAQUE FLOOR STRIP behind the planks: fills plank gaps + any transparent
+  // bottom of the background so the running area is never see-through.
+  const floorTop=groundY-6*SC;
+  const fg=ctx.createLinearGradient(0,floorTop,0,H);
+  fg.addColorStop(0,"#e8bd80"); fg.addColorStop(1,FIELD.groundFallback);
+  ctx.fillStyle=fg; ctx.fillRect(0,floorTop,W,H-floorTop);
+  // soft contact shadow so the mouse's feet blend onto the floor
+  ctx.fillStyle="rgba(60,30,10,.12)"; ctx.fillRect(0,floorTop,W,4*SC);
+
+  // ground planks on top — their transparent gaps now reveal the wood floor
+  drawTiled("main_ground", 1.0, groundY-10*SC, H-groundY+10*SC, FIELD.groundFallback);
 
   if(game){
-    // items
     for(const it of game.items){
       drawSprite(it.key, it.x, it.footY+it.r, it.r*2.2, (cx,fy,h)=>{ ctx.fillStyle="#ffd21f"; ctx.beginPath(); ctx.arc(cx,fy-h/2,h*0.4,0,6.28); ctx.fill(); });
     }
-    // obstacles (bird shows a diegetic ground shadow — not a UI warning)
     for(const o of game.obstacles){
       if(o.shadow){ drawSprite("bird_shadow", o.x, groundY+2*SC, 16*SC, null); }
       drawSprite(o.key, o.x, o.footY, o.drawH, (cx,fy,h)=>{
@@ -384,11 +408,9 @@ function render(){
     if(sh){ const aw=70*SC*shScale, ah=aw*(sh.naturalHeight/sh.naturalWidth); ctx.globalAlpha=0.5*shScale; ctx.drawImage(sh, mouseX-aw/2, groundY-ah*0.4, aw, ah); ctx.globalAlpha=1; }
     else { ctx.globalAlpha=0.22*shScale; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(mouseX,groundY,30*SC*shScale,8*SC*shScale,0,0,6.28); ctx.fill(); ctx.globalAlpha=1; }
 
-    // dust
     for(const d of game.dusts){ ctx.globalAlpha=Math.max(0,d.t)*0.8; drawSprite("dust", d.x, d.y, 26*SC, (cx,fy,h)=>{ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(cx,fy-h/2,h*0.4,0,6.28);ctx.fill();}); }
     ctx.globalAlpha=1;
 
-    // player
     let key="m_run1";
     if(player.dead) key="m_over";
     else if(!player.onGround) key="m_jump";
@@ -399,18 +421,16 @@ function render(){
     const footY = player.sliding ? groundY : groundY + player.y;
     drawSprite(key, mouseX, footY, ph, (cx,fy,h)=>{ ctx.fillStyle="#d7cef0"; ctx.strokeStyle="#221a44"; ctx.lineWidth=3; ctx.beginPath(); ctx.ellipse(cx,fy-h*0.45,h*0.32,h*0.42,0,0,6.28); ctx.fill(); ctx.stroke(); });
 
-    // collect fx
     for(const f of game.fx){ ctx.globalAlpha=Math.max(0,f.t); drawSprite(f.key, f.x, f.y+f.r, f.r*2, (cx,fy,h)=>{ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(cx,fy-h/2,h*0.4,0,6.28);ctx.fill();}); }
     ctx.globalAlpha=1;
 
-    // world-change banner
+    // level-up banner (number only — background never changes)
     if(game.banner>0.02){
-      const a=Math.min(1,game.banner*1.2);
-      ctx.globalAlpha=a*0.9; ctx.fillStyle="rgba(28,23,54,.5)"; ctx.fillRect(0,H*0.36,W,H*0.13);
+      const a=Math.min(1,game.banner*1.3);
       ctx.globalAlpha=a; ctx.textAlign="center"; ctx.fillStyle="#fff";
-      ctx.font="800 "+Math.floor(Math.min(W*0.09,46))+"px Baloo 2, sans-serif";
-      ctx.lineWidth=6; ctx.strokeStyle="#221a44"; ctx.strokeText(WORLDS[game.worldIdx].name, W/2, H*0.45);
-      ctx.fillText(WORLDS[game.worldIdx].name, W/2, H*0.45);
+      ctx.font="800 "+Math.floor(Math.min(W*0.085,44))+"px Baloo 2, sans-serif";
+      ctx.lineWidth=6; ctx.strokeStyle="#221a44"; ctx.strokeText("LEVEL "+game.level, W/2, H*0.30);
+      ctx.fillText("LEVEL "+game.level, W/2, H*0.30);
       ctx.globalAlpha=1; ctx.textAlign="start";
     }
     if(game.flash>0.02){ ctx.globalAlpha=game.flash*0.4; ctx.fillStyle="#ff2b2b"; ctx.fillRect(-40,-40,W+80,H+80); ctx.globalAlpha=1; }
