@@ -6,6 +6,7 @@
     <meta name="description" content="Color Bridge - A fast-paced color switching arcade game. Tap to match colors and survive as long as you can!">
     <title>Color Bridge</title>
     <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
         
@@ -440,6 +441,85 @@
         .rank-1 { color: #ffdd33; }
         .rank-2 { color: #c0c0c0; }
         .rank-3 { color: #cd7f32; }
+        .ranking-item .r-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin: 0 8px;
+            color: #d8d8e8;
+        }
+        .ranking-item .r-score { font-weight: 900; color: #fff; }
+
+        #nameEntry {
+            display: flex;
+            gap: 8px;
+            margin: 14px 0 6px;
+        }
+        #nameInput {
+            flex: 1;
+            background: rgba(255,255,255,0.06);
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 12px 14px;
+            color: #fff;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 0.9em;
+            outline: none;
+            min-width: 0;
+        }
+        #nameInput:focus { border-color: #4da6ff; }
+        #submitScoreBtn {
+            border: none;
+            background: linear-gradient(135deg, #4da6ff, #3333ff);
+            color: #fff;
+            font-weight: 900;
+            border-radius: 12px;
+            padding: 0 18px;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.85em;
+            white-space: nowrap;
+        }
+        #submitScoreBtn:disabled { opacity: 0.5; cursor: default; }
+
+        .rank-tabs {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .rank-tab-group {
+            display: flex;
+            gap: 6px;
+        }
+        .rank-tab {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 7px 4px;
+            color: #9a9ab0;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.65em;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+        .rank-tab.active {
+            color: #fff;
+            border-color: #4da6ff;
+            background: rgba(77, 166, 255, 0.12);
+        }
+        #rankingStatus {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.62em;
+            font-weight: 700;
+            text-align: center;
+            margin-top: 6px;
+            min-height: 14px;
+        }
     </style>
 </head>
 <body>
@@ -500,7 +580,22 @@
                     <div class="stat-box"><div class="stat-value" id="statBlocks">0</div><div class="stat-label">BLOCKS</div></div>
                 </div>
                 
+                <div id="nameEntry">
+                    <input id="nameInput" type="text" maxlength="20" placeholder="NICKNAME" autocomplete="off">
+                    <button id="submitScoreBtn">SUBMIT</button>
+                </div>
+                <div class="rank-tabs">
+                    <div class="rank-tab-group">
+                        <button class="rank-tab period-tab active" data-period="daily">DAILY</button>
+                        <button class="rank-tab period-tab" data-period="weekly">WEEKLY</button>
+                    </div>
+                    <div class="rank-tab-group">
+                        <button class="rank-tab rmode-tab active" data-rmode="classic">CLASSIC</button>
+                        <button class="rank-tab rmode-tab" data-rmode="hard">HARD</button>
+                    </div>
+                </div>
                 <div id="rankingList"></div>
+                <div id="rankingStatus"></div>
                 
                 <button class="btn btn-primary" id="restartBtn">RETRY</button>
                 <button class="btn btn-secondary" id="menuBtn" style="margin-top:10px">MENU</button>
@@ -545,7 +640,11 @@
             scoreDiff: document.getElementById('scoreDiff'),
             recoveryGaugeFill: document.getElementById('recoveryGaugeFill'),
             recoveryGaugeText: document.getElementById('recoveryGaugeText'),
-            rankingList: document.getElementById('rankingList')
+            rankingList: document.getElementById('rankingList'),
+            nameEntry: document.getElementById('nameEntry'),
+            nameInput: document.getElementById('nameInput'),
+            submitScoreBtn: document.getElementById('submitScoreBtn'),
+            rankingStatus: document.getElementById('rankingStatus')
         };
         const stats = {
             level: document.getElementById('statLevel'),
@@ -586,6 +685,21 @@
         const BGM_VOLUME = 0.04;
         const BGM_START_OFFSET = 2;
         const CROSSFADE = 0.6;
+
+        // --- Supabase online ranking config ---
+        const SUPABASE_URL = 'https://fqctemblbhlxfjumyzus.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_WYpwUhmWdpx7fsxeptK3JA_oNcAT66f';
+        let sbClient = null;
+        try {
+            if (window.supabase && SUPABASE_URL && SUPABASE_KEY) {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        } catch (e) {
+            console.warn('Supabase init failed:', e);
+            sbClient = null;
+        }
+        let rankView = { period: 'daily', mode: 'classic' };
+        let scoreSubmitted = false;
         
         function getLevelConfig(level) {
             const manual = [
@@ -1593,7 +1707,7 @@
             stats.maxCombo.textContent = maxCombo;
             stats.blocks.textContent = blocksCleared;
             
-            renderRankings(record);
+            initRankingPanel();
             ui.scoreCenter.classList.add('hidden');
             ui.topBar.classList.add('hidden');
             ui.pauseBtn.classList.add('hidden');
@@ -1611,19 +1725,135 @@
             showScreen('gameOver');
         }
         
-        function renderRankings(currentRecord) {
-            const top3 = rankings.slice(0, 3);
-            ui.rankingList.innerHTML = '';
-            for (let i = 0; i < 3; i++) {
-                const r = top3[i];
-                const isCurrent = r && r.date === currentRecord.date;
-                const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : 'rank-3';
-                const label = i === 0 ? '1st' : i === 1 ? '2nd' : '3rd';
-                const html = r
-                    ? `<div class="ranking-item ${isCurrent ? 'current' : ''}"><span class="rank ${rankClass}">${label}</span><span>${r.score} <small style="opacity:0.5">LV${r.level || 1}</small></span></div>`
-                    : `<div class="ranking-item"><span class="rank ${rankClass}">${label}</span><span>-</span></div>`;
-                ui.rankingList.innerHTML += html;
+        function periodStartISO(period) {
+            const now = new Date();
+            if (period === 'daily') {
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+                return d.toISOString();
             }
+            // weekly = last 7 days
+            const d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return d.toISOString();
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[c]);
+        }
+
+        function setRankingStatus(msg) {
+            if (ui.rankingStatus) ui.rankingStatus.textContent = msg || '';
+        }
+
+        function renderRankingRows(rows, highlightId) {
+            ui.rankingList.innerHTML = '';
+            if (!rows || rows.length === 0) {
+                ui.rankingList.innerHTML = '<div class="ranking-item"><span class="rank">-</span><span class="r-name">まだ記録がないよ</span><span class="r-score">-</span></div>';
+                return;
+            }
+            const top = rows.slice(0, 10);
+            for (let i = 0; i < top.length; i++) {
+                const r = top[i];
+                const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+                const label = (i + 1) + (i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th');
+                const isCurrent = highlightId != null && r.id === highlightId;
+                ui.rankingList.innerHTML +=
+                    `<div class="ranking-item ${isCurrent ? 'current' : ''}">` +
+                    `<span class="rank ${rankClass}">${label}</span>` +
+                    `<span class="r-name">${escapeHtml(r.name)}</span>` +
+                    `<span class="r-score">${r.score}</span></div>`;
+            }
+        }
+
+        async function fetchAndRenderRanking(highlightId) {
+            if (!sbClient) {
+                ui.rankingList.innerHTML = '';
+                setRankingStatus('オフライン：ランキングに接続できないよ');
+                return;
+            }
+            setRankingStatus('読み込み中…');
+            try {
+                const { data, error } = await sbClient
+                    .from('scores')
+                    .select('id, name, score, created_at')
+                    .eq('mode', rankView.mode)
+                    .gte('created_at', periodStartISO(rankView.period))
+                    .order('score', { ascending: false })
+                    .limit(10);
+                if (error) throw error;
+                renderRankingRows(data, highlightId);
+                const periodLabel = rankView.period === 'daily' ? '本日' : '週間';
+                const modeLabel = rankView.mode.toUpperCase();
+                setRankingStatus(`${periodLabel} / ${modeLabel} TOP10`);
+            } catch (e) {
+                console.warn('fetch ranking failed:', e);
+                ui.rankingList.innerHTML = '';
+                setRankingStatus('ランキングの取得に失敗したよ');
+            }
+        }
+
+        async function submitScore() {
+            if (!sbClient) {
+                setRankingStatus('オフライン：送信できないよ');
+                return;
+            }
+            if (scoreSubmitted) return;
+            const name = (ui.nameInput.value || '').trim().slice(0, 20);
+            if (name.length < 1) {
+                setRankingStatus('ニックネームを入れてね');
+                ui.nameInput.focus();
+                return;
+            }
+            ui.submitScoreBtn.disabled = true;
+            setRankingStatus('送信中…');
+            try {
+                localStorage.setItem('colorBridgeName', name);
+                const { data, error } = await sbClient
+                    .from('scores')
+                    .insert({ name, score, mode: selectedMode })
+                    .select('id')
+                    .single();
+                if (error) throw error;
+                scoreSubmitted = true;
+                ui.nameEntry.style.display = 'none';
+                // show the board for the mode/period the player just competed in
+                rankView.mode = (selectedMode === 'hard') ? 'hard' : 'classic';
+                updateRankTabsUI();
+                await fetchAndRenderRanking(data ? data.id : null);
+            } catch (e) {
+                console.warn('submit score failed:', e);
+                ui.submitScoreBtn.disabled = false;
+                setRankingStatus('送信に失敗したよ。もう一度試してね');
+            }
+        }
+
+        function updateRankTabsUI() {
+            document.querySelectorAll('.period-tab').forEach(b => {
+                b.classList.toggle('active', b.dataset.period === rankView.period);
+            });
+            document.querySelectorAll('.rmode-tab').forEach(b => {
+                b.classList.toggle('active', b.dataset.rmode === rankView.mode);
+            });
+        }
+
+        function initRankingPanel() {
+            scoreSubmitted = false;
+            // default view = the mode just played, daily
+            rankView.period = 'daily';
+            rankView.mode = (selectedMode === 'hard') ? 'hard' : 'classic';
+            updateRankTabsUI();
+
+            const rankable = (selectedMode === 'classic' || selectedMode === 'hard');
+            if (sbClient && rankable) {
+                ui.nameEntry.style.display = 'flex';
+                ui.submitScoreBtn.disabled = false;
+                const savedName = localStorage.getItem('colorBridgeName') || '';
+                ui.nameInput.value = savedName;
+            } else {
+                ui.nameEntry.style.display = 'none';
+            }
+            fetchAndRenderRanking(null);
         }
         
         function checkLevelUp() {
@@ -1796,6 +2026,27 @@
         document.getElementById('resumeBtn').addEventListener('click', resumeGame);
         document.getElementById('pauseMenuBtn').addEventListener('click', returnToMenu);
         document.getElementById('pauseBtn').addEventListener('click', pauseGame);
+
+        // --- Online ranking listeners ---
+        ui.submitScoreBtn.addEventListener('click', submitScore);
+        ui.nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); submitScore(); }
+        });
+        document.querySelectorAll('.period-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                rankView.period = btn.dataset.period;
+                updateRankTabsUI();
+                fetchAndRenderRanking(null);
+            });
+        });
+        document.querySelectorAll('.rmode-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                rankView.mode = btn.dataset.rmode;
+                updateRankTabsUI();
+                fetchAndRenderRanking(null);
+            });
+        });
+
         ui.muteBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
