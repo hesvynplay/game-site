@@ -601,7 +601,8 @@
         ];
         const LOOP_START = 129;
         const LOOP_END = 245;
-        const BGM_VOLUME = 0.06;
+        const BGM_VOLUME = 0.04;
+        const BGM_START_OFFSET = 2;
         
         function getLevelConfig(level) {
             const manual = [
@@ -877,7 +878,7 @@
                     this.compressor.release.value = 0.12;
 
                     this.master = this.context.createGain();
-                    this.master.gain.value = 2.0;
+                    this.master.gain.value = 3.0;
                     this.bgmGain = this.context.createGain();
                     this.bgmGain.gain.value = this.muted ? 0 : BGM_VOLUME;
 
@@ -960,7 +961,7 @@
                     this.bgmGain.gain.cancelScheduledValues(t);
                     this.bgmGain.gain.setValueAtTime(0, t);
                     if (!this.muted) {
-                        this.bgmGain.gain.linearRampToValueAtTime(BGM_VOLUME, t + 2);
+                        this.bgmGain.gain.linearRampToValueAtTime(BGM_VOLUME, t + 0.3);
                     }
                 }
                 const source = context.createBufferSource();
@@ -969,7 +970,7 @@
                 source.loopStart = LOOP_START;
                 source.loopEnd = LOOP_END;
                 source.connect(this.bgmGain);
-                source.start(0);
+                source.start(0, BGM_START_OFFSET);
                 this.bgmSource = source;
             },
 
