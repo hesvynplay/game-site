@@ -601,6 +601,7 @@
         ];
         const LOOP_START = 129;
         const LOOP_END = 245;
+        const BGM_VOLUME = 0.12;
         
         function getLevelConfig(level) {
             const manual = [
@@ -878,7 +879,7 @@
                     this.master = this.context.createGain();
                     this.master.gain.value = 0.65;
                     this.bgmGain = this.context.createGain();
-                    this.bgmGain.gain.value = this.muted ? 0 : 0.35;
+                    this.bgmGain.gain.value = this.muted ? 0 : BGM_VOLUME;
 
                     this.compressor.connect(this.master);
                     this.bgmGain.connect(this.master);
@@ -908,7 +909,7 @@
             toggleMute() {
                 this.muted = !this.muted;
                 localStorage.setItem('colorBridgeMuted', this.muted ? '1' : '0');
-                if (this.bgmGain) this.bgmGain.gain.value = this.muted ? 0 : 0.35;
+                if (this.bgmGain) this.bgmGain.gain.value = this.muted ? 0 : BGM_VOLUME;
                 this.updateMuteButton();
             },
 
@@ -954,7 +955,14 @@
                 const buffer = await this.loadBgm().catch(() => null);
                 if (!buffer) return;
                 this.stopBgm();
-                if (this.bgmGain) this.bgmGain.gain.value = this.muted ? 0 : 0.35;
+                const t = context.currentTime;
+                if (this.bgmGain) {
+                    this.bgmGain.gain.cancelScheduledValues(t);
+                    this.bgmGain.gain.setValueAtTime(0, t);
+                    if (!this.muted) {
+                        this.bgmGain.gain.linearRampToValueAtTime(BGM_VOLUME, t + 2);
+                    }
+                }
                 const source = context.createBufferSource();
                 source.buffer = buffer;
                 source.loop = true;
