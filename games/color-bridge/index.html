@@ -560,8 +560,8 @@
                 </div>
                 
                 <button class="btn btn-primary" id="startBtn">PLAY</button>
-                <div style="font-size:0.6em; color:rgba(255,255,255,0.35); margin-top:14px; text-align:center;">Music: Geometric Memory — HTb-music (Pixabay)</div>
-                <div style="font-size:0.55em; color:rgba(0,255,136,0.7); margin-top:4px; text-align:center; font-weight:800; letter-spacing:1px;">BUILD v7 · SCORE FIX</div>
+                <div style="font-size:0.58em; color:rgba(255,255,255,0.3); margin-top:12px; text-align:center; line-height:1.4;">Your name and score are saved online for rankings.</div>
+                <div style="font-size:0.6em; color:rgba(255,255,255,0.35); margin-top:6px; text-align:center;">Music: Geometric Memory — HTb-music (Pixabay)</div>
             </div>
             
             <div id="gameOverScreen" class="screen hidden">
@@ -604,7 +604,6 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        console.log('%c Color Bridge BUILD v7 · SCORE FIX ', 'background:#00e676;color:#000;font-weight:bold;');
         const screens = {
             start: document.getElementById('startScreen'),
             gameOver: document.getElementById('gameOverScreen'),
@@ -2059,8 +2058,11 @@
                 e.preventDefault();
                 if (state === 'playing' && !isPaused) switchColor();
             }
-            if (e.code === 'Escape' && state === 'playing') {
-                isPaused ? resumeGame() : pauseGame();
+            if (e.code === 'Escape' || e.code === 'KeyP') {
+                if (state === 'playing') {
+                    e.preventDefault();
+                    isPaused ? resumeGame() : pauseGame();
+                }
             }
         });
         
