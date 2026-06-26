@@ -478,7 +478,7 @@
                 <div class="section-title">MODE</div>
                 <div class="mode-grid">
                     <button class="mode-btn active" data-mode="classic"><span class="mode-icon">⚡</span>CLASSIC</button>
-                    <button class="mode-btn" data-mode="rush"><span class="mode-icon">🔥</span>RUSH</button>
+                    <button class="mode-btn" data-mode="hard"><span class="mode-icon">🔥</span>HARD</button>
                     <button class="mode-btn" data-mode="zen"><span class="mode-icon">🌿</span>ZEN</button>
                 </div>
                 
@@ -584,9 +584,16 @@
             ]
         };
         
+        const HARD_COLORS = [
+            { name: 'red', hex: '#ff4d4d', glow: 'rgba(255, 77, 77, 0.6)' },
+            { name: 'blue', hex: '#4da6ff', glow: 'rgba(77, 166, 255, 0.6)' },
+            { name: 'yellow', hex: '#ffdd33', glow: 'rgba(255, 221, 51, 0.6)' },
+            { name: 'green', hex: '#00e676', glow: 'rgba(0, 230, 118, 0.6)' }
+        ];
+        
         const MODES = {
             classic: { speedMult: 0.85, spawnMult: 1.0, feverThreshold: 10, scoreMult: 1.0 },
-            rush: { speedMult: 1.15, spawnMult: 0.7, feverThreshold: 8, scoreMult: 1.5 },
+            hard: { speedMult: 1.15, spawnMult: 0.7, feverThreshold: 8, scoreMult: 1.5 },
             zen: { speedMult: 0.75, spawnMult: 1.15, feverThreshold: 12, scoreMult: 0.8 }
         };
         
@@ -754,7 +761,7 @@
             const baseDurability = level >= 6 ? 3 : (level >= 3 ? (Math.random() < 0.5 ? 2 : 3) : 2);
             let durability = baseDurability;
             if (level >= 8 && Math.random() < 0.18) durability = 4;
-            if (selectedMode === 'rush') durability += Math.random() < 0.35 ? 1 : 0;
+            if (selectedMode === 'hard') durability += Math.random() < 0.35 ? 1 : 0;
             if (selectedMode === 'zen') durability = Math.min(durability, 3);
             return Math.max(2, Math.min(durability, 4));
         }
@@ -771,7 +778,7 @@
             recoveryGauge += amount;
             if (recoveryGauge >= RECOVERY_NEEDED) {
                 const units = Math.floor(recoveryGauge / RECOVERY_NEEDED);
-                if (selectedMode !== 'zen' && selectedMode !== 'rush' && lives < maxLives) {
+                if (selectedMode !== 'zen' && selectedMode !== 'hard' && lives < maxLives) {
                     const recovered = Math.min(units, maxLives - lives);
                     lives += recovered;
                     recoveryGauge -= recovered * RECOVERY_NEEDED;
@@ -1428,6 +1435,7 @@
         
         function startGame() {
             state = 'playing';
+            COLORS = (selectedMode === 'hard') ? HARD_COLORS : THEMES[currentTheme];
             isPaused = false;
             score = 0;
             combo = 0;
@@ -1701,7 +1709,7 @@
                     maxDurability: durability
                 });
                 heavyBlockCooldown = Math.max(30, 70 - level * 4);
-                if (selectedMode === 'rush') heavyBlockCooldown -= 8;
+                if (selectedMode === 'hard') heavyBlockCooldown -= 8;
                 if (selectedMode === 'zen') heavyBlockCooldown += 10;
                 if (lives === 1) heavyBlockCooldown += 10;
                 if (lives === 1 && recoveryGauge >= 7) heavyBlockCooldown += 8;
@@ -1805,7 +1813,7 @@
             const mode = MODES[selectedMode];
             const cfg = getLevelConfig(level);
             
-            difficulty = 1 + score / (selectedMode === 'rush' ? 450 : 700) + cfg.speedAdd * 0.15;
+            difficulty = 1 + score / (selectedMode === 'hard' ? 450 : 2100) + cfg.speedAdd * 0.15;
             baseSpeed = (2.6 + difficulty * 0.7 + cfg.speedAdd) * mode.speedMult;
             speed = baseSpeed;
             
@@ -1910,7 +1918,7 @@
                             ui.score.textContent = score;
                             ui.combo.textContent = 'x' + combo;
                             ui.combo.style.opacity = combo >= 2 ? '1' : '0';
-                            if (selectedMode !== 'rush') updateRecoveryGauge(4);
+                            if (selectedMode !== 'hard') updateRecoveryGauge(4);
                             SoundManager.playHeavyBreak();
                             addFloatingText('CRUSHED!', w / 2, bridgeY - 70, '#ffffff');
                             createExplosion(b.x + b.width / 2, bridgeY, '#ffffff', 34);
@@ -1935,7 +1943,7 @@
                             saveChanceActive = false;
                             saveChanceTimer = 0;
                             saveChanceBlock = null;
-                            if (selectedMode !== 'rush') updateRecoveryGauge(5);
+                            if (selectedMode !== 'hard') updateRecoveryGauge(5);
                             SoundManager.playSuccess();
                             ui.saveBadge.style.opacity = '0';
                             addFloatingText('SAVED!', w / 2, bridgeY - 70, '#00ff88');
@@ -1999,7 +2007,7 @@
                             continue;
                         }
 
-                        if (selectedMode !== 'rush' && selectedMode !== 'zen' && lives === 1 && lifeOneRescueCooldown <= 0 && recoveryGauge >= 3) {
+                        if (selectedMode !== 'hard' && selectedMode !== 'zen' && lives === 1 && lifeOneRescueCooldown <= 0 && recoveryGauge >= 3) {
                             b.passed = true;
                             combo = 0;
                             ui.combo.style.opacity = '0';
