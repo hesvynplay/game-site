@@ -584,6 +584,44 @@
             from { opacity: 0; transform: translateX(-50%) scale(0.8); }
             to   { opacity: 1; transform: translateX(-50%) scale(1); }
         }
+
+        #tutFreeze {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 22%;
+            pointer-events: none;
+            z-index: 40;
+        }
+        #tutFreezeMsg {
+            background: linear-gradient(90deg, #ffdd33, #ffaa00);
+            color: #1a1a1a;
+            padding: 14px 28px;
+            border-radius: 24px;
+            font-weight: 900;
+            font-size: 1.4em;
+            text-align: center;
+            letter-spacing: 0.5px;
+            box-shadow: 0 0 30px rgba(255,200,40,0.6);
+            animation: tutFreezePop 0.35s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        #tutFreezeCont {
+            margin-top: 16px;
+            color: #fff;
+            font-weight: 800;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            animation: tutFloat 1.4s ease-in-out infinite;
+        }
+        @keyframes tutFreezePop {
+            from { opacity: 0; transform: scale(0.7); }
+            to   { opacity: 1; transform: scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -618,6 +656,10 @@
         <div id="tutGuide" class="hidden">
             <div id="tutPulse"></div>
             <div id="tutText">TAP<br><span>to match the color</span></div>
+        </div>
+        <div id="tutFreeze" class="hidden">
+            <div id="tutFreezeMsg"></div>
+            <div id="tutFreezeCont">TAP to continue</div>
         </div>
 
         <div id="ui">
@@ -711,7 +753,9 @@
             rankSummary: document.getElementById('rankSummary'),
             tutGuide: document.getElementById('tutGuide'),
             tutText: document.getElementById('tutText'),
-            tutBanner: document.getElementById('tutBanner')
+            tutBanner: document.getElementById('tutBanner'),
+            tutFreeze: document.getElementById('tutFreeze'),
+            tutFreezeMsg: document.getElementById('tutFreezeMsg')
         };
         const stats = {
             level: document.getElementById('statLevel'),
@@ -773,6 +817,53 @@
         const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
         const ACTION_WORD = IS_TOUCH ? 'TAP' : 'CLICK';
         let tutBannerTimer = null;
+        let tutFreeze = false;
+        let pendingTutFreeze = null;
+
+        function activateTutFreeze(block) {
+            tutFreeze = true;
+            // mark this hint as seen so it won't repeat
+            if (block.tutType === 'heavy') {
+                localStorage.setItem('colorBridgeHeavyHintDone', '1');
+                ui.tutFreezeMsg.textContent = 'HIT IT ' + (block.tutVal || 2) + ' TIMES!';
+            } else {
+                localStorage.setItem('colorBridgeZebraHintDone', '1');
+                ui.tutFreezeMsg.textContent = 'MATCH EITHER COLOR!';
+            }
+            block.tutType = null;
+            drawTutSpotlight(block);
+            ui.tutFreeze.classList.remove('hidden');
+        }
+
+        function drawTutSpotlight(block) {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            // dim everything
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.62)';
+            ctx.fillRect(0, 0, w, h);
+            // glowing ring around the block
+            const cx = block.x + block.width / 2;
+            const cy = block.y + block.height / 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, block.width * 0.95, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 24;
+            ctx.stroke();
+            ctx.restore();
+            // redraw the highlighted block on top of the dim layer
+            drawBlock(block, getLevelConfig(level));
+        }
+
+        function resumeTutFreeze() {
+            if (!tutFreeze) return;
+            tutFreeze = false;
+            ui.tutFreeze.classList.add('hidden');
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
 
         function showBasicGuide() {
             if (localStorage.getItem('colorBridgeTutDone') === '1') return;
@@ -798,6 +889,9 @@
         function hideAllTutorial() {
             ui.tutGuide.classList.add('hidden');
             ui.tutBanner.classList.add('hidden');
+            ui.tutFreeze.classList.add('hidden');
+            tutFreeze = false;
+            pendingTutFreeze = null;
             if (tutBannerTimer) { clearTimeout(tutBannerTimer); tutBannerTimer = null; }
         }
         function maybeShowHeavyHint(durability) {
@@ -2096,8 +2190,7 @@
                 heavyBlockActive = true;
                 nextHeavyBlockScore += 240 + level * 45;
                 updateHeavyBlockBadge(durability);
-                maybeShowHeavyHint(durability);
-                blocks.push({
+                const heavyBlock = {
                     x: leftX + laneWidth / 2 - 52,
                     y: -136,
                     width: 104,
@@ -2113,7 +2206,12 @@
                     invuln: 0,
                     durability,
                     maxDurability: durability
-                });
+                };
+                if (localStorage.getItem('colorBridgeHeavyHintDone') !== '1') {
+                    heavyBlock.tutType = 'heavy';
+                    heavyBlock.tutVal = durability;
+                }
+                blocks.push(heavyBlock);
                 heavyBlockCooldown = Math.max(30, 70 - level * 4);
                 if (selectedMode === 'hard') heavyBlockCooldown -= 8;
                 if (selectedMode === 'zen') heavyBlockCooldown += 10;
@@ -2134,7 +2232,7 @@
                 return;
             }
             
-            blocks.push({
+            const newBlock = {
                 x: leftX + Math.random() * (laneWidth - 70),
                 y: -90,
                 width: candidateBlock.height,
@@ -2148,8 +2246,11 @@
                 opacity: data.type === 'ghost' ? 0.4 : 1,
                 wobbleOffset: Math.random() * Math.PI * 2,
                 invuln: 0
-            });
-            if (data.type === 'zebra') maybeShowZebraHint();
+            };
+            if (data.type === 'zebra' && localStorage.getItem('colorBridgeZebraHintDone') !== '1') {
+                newBlock.tutType = 'zebra';
+            }
+            blocks.push(newBlock);
         }
         
         function createExplosion(x, y, color, count = 18) {
@@ -2211,14 +2312,17 @@
         
         canvas.addEventListener('pointerdown', (e) => {
             e.preventDefault();
+            if (tutFreeze) { resumeTutFreeze(); return; }
             if (state === 'playing' && !isPaused) switchColor();
         });
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
                 e.preventDefault();
+                if (tutFreeze) { resumeTutFreeze(); return; }
                 if (state === 'playing' && !isPaused) switchColor();
             }
             if (e.code === 'Escape' || e.code === 'KeyP') {
+                if (tutFreeze) { e.preventDefault(); resumeTutFreeze(); return; }
                 if (state === 'playing') {
                     e.preventDefault();
                     isPaused ? resumeGame() : pauseGame();
@@ -2229,6 +2333,7 @@
         function gameLoop(timestamp) {
             if (state !== 'playing') return;
             if (isPaused) return;
+            if (tutFreeze) return;
             const dt = Math.min((timestamp - lastTime) / 16.67, 3);
             lastTime = timestamp;
             
@@ -2297,6 +2402,9 @@
             for (let b of blocks) {
                 b.y += b.speed * dt;
                 b.invuln = Math.max(0, (b.invuln || 0) - dt);
+                if (b.tutType && !pendingTutFreeze && (b.y + b.height / 2) >= h / 2) {
+                    pendingTutFreeze = b;
+                }
                 b.rotation += cfg.effects.includes('fastspin') ? 0.06 * dt : 0.025 * dt;
                 b.pulse = Math.sin(timestamp * 0.012) * 0.08;
                 if (b.type === 'ghost') b.opacity = 0.35 + Math.sin(timestamp * 0.008) * 0.15;
@@ -2547,6 +2655,12 @@
             
             if (ui.score.textContent !== String(score)) ui.score.textContent = score;
             draw(w, h, bridgeY);
+            if (pendingTutFreeze) {
+                const fb = pendingTutFreeze;
+                pendingTutFreeze = null;
+                activateTutFreeze(fb);
+                return;
+            }
             requestAnimationFrame(gameLoop);
         }
         
