@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, orientation=portrait">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, orientation=portrait, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="description" content="Color Bridge - A fast-paced color switching arcade game. Tap to match colors and survive as long as you can!">
     <title>Color Bridge</title>
     <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
@@ -24,14 +27,19 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            min-height: 100dvh;
             overflow: hidden;
             font-family: 'Montserrat', sans-serif;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            box-sizing: border-box;
         }
         #gameContainer {
             position: relative;
             width: 100%;
             max-width: 480px;
             aspect-ratio: 9/16;
+            max-height: 100%;
             background: #0a0a12;
         }
         @media (min-width: 900px) {
@@ -793,7 +801,7 @@
             { level: 6, scoreNeeded: 2200, colors: 4, speedAdd: 3.2, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] },
             { level: 7, scoreNeeded: 3200, colors: 4, speedAdd: 3.8, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] }
         ];
-        const BGM_VOLUME = 0.04;
+        const BGM_VOLUME = 0.06;
         const BGM_START_OFFSET = 2;
         const CROSSFADE = 0.6;
 
@@ -1132,6 +1140,7 @@
         const SoundManager = {
             context: null,
             compressor: null,
+            limiter: null,
             master: null,
             bgmGain: null,
             bgmBuffer: null,
@@ -1159,20 +1168,30 @@
 
                     this.context = new AudioContextClass();
                     this.compressor = this.context.createDynamicsCompressor();
-                    this.compressor.threshold.value = -26;
+                    this.compressor.threshold.value = -24;
                     this.compressor.knee.value = 18;
-                    this.compressor.ratio.value = 3.2;
-                    this.compressor.attack.value = 0.003;
-                    this.compressor.release.value = 0.12;
+                    this.compressor.ratio.value = 3.0;
+                    this.compressor.attack.value = 0.004;
+                    this.compressor.release.value = 0.14;
 
                     this.master = this.context.createGain();
-                    this.master.gain.value = 3.0;
+                    this.master.gain.value = 2.0;
                     this.bgmGain = this.context.createGain();
                     this.bgmGain.gain.value = this.muted ? 0 : BGM_VOLUME;
 
+                    // Brick-wall limiter on the final output to prevent clipping/distortion
+                    // when several sounds overlap (especially on phone speakers).
+                    this.limiter = this.context.createDynamicsCompressor();
+                    this.limiter.threshold.value = -1.5;
+                    this.limiter.knee.value = 0;
+                    this.limiter.ratio.value = 20;
+                    this.limiter.attack.value = 0.001;
+                    this.limiter.release.value = 0.1;
+
                     this.compressor.connect(this.master);
                     this.bgmGain.connect(this.master);
-                    this.master.connect(this.context.destination);
+                    this.master.connect(this.limiter);
+                    this.limiter.connect(this.context.destination);
                 }
                 return this.context;
             },
