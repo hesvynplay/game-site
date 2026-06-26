@@ -36,10 +36,8 @@
         }
         #gameContainer {
             position: relative;
-            width: 100%;
-            max-width: 480px;
+            width: min(100vw, 480px, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
             aspect-ratio: 9/16;
-            max-height: 100%;
             background: #0a0a12;
         }
         @media (min-width: 900px) {
@@ -205,9 +203,19 @@
             padding: 14px 16px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             pointer-events: none;
             z-index: 10;
+        }
+        .top-left, .top-right {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+        .top-right {
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
         }
         #pauseBtn {
             width: 42px;
@@ -637,15 +645,19 @@
         <canvas id="gameCanvas"></canvas>
         
         <div id="topBar" class="hidden">
-            <button id="pauseBtn">⏸</button>
-            <button id="muteBtn">🔊</button>
-            <div id="levelBadge">LV 1</div>
-            <div id="livesDisplay">
-                <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff4d4d"/></svg>
-                <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff4d4d"/></svg>
-                <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff4d4d"/></svg>
+            <div class="top-left">
+                <button id="pauseBtn">⏸</button>
+                <button id="muteBtn">🔊</button>
             </div>
-            <div id="zenLives" class="hidden">∞</div>
+            <div class="top-right">
+                <div id="levelBadge">LV 1</div>
+                <div id="livesDisplay">
+                    <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff4d4d"/></svg>
+                    <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff4d4d"/></svg>
+                    <svg class="heart" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff4d4d"/></svg>
+                </div>
+                <div id="zenLives" class="hidden">∞</div>
+            </div>
         </div>
         
         <div id="scoreCenter" class="hidden">
@@ -801,7 +813,7 @@
             { level: 6, scoreNeeded: 2200, colors: 4, speedAdd: 3.2, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] },
             { level: 7, scoreNeeded: 3200, colors: 4, speedAdd: 3.8, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] }
         ];
-        const BGM_VOLUME = 0.06;
+        const BGM_VOLUME = 0.03;
         const BGM_START_OFFSET = 2;
         const CROSSFADE = 0.6;
 
@@ -1390,12 +1402,13 @@
                 amp.gain.setValueAtTime(0.0001, startTime);
                 amp.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), startTime + attack);
                 amp.gain.exponentialRampToValueAtTime(0.0001, startTime + duration + release);
+                amp.gain.linearRampToValueAtTime(0, startTime + duration + release + 0.01);
 
                 lastNode.connect(amp);
                 this.route(amp);
 
                 osc.start(startTime);
-                osc.stop(startTime + duration + release + 0.03);
+                osc.stop(startTime + duration + release + 0.04);
             },
 
             noise({
@@ -1432,13 +1445,14 @@
                 amp.gain.setValueAtTime(0.0001, startTime);
                 amp.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), startTime + 0.004);
                 amp.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+                amp.gain.linearRampToValueAtTime(0, startTime + duration + 0.01);
 
                 source.connect(filter);
                 filter.connect(amp);
                 this.route(amp);
 
                 source.start(startTime);
-                source.stop(startTime + duration + 0.03);
+                source.stop(startTime + duration + 0.04);
             },
 
             playTap() {
