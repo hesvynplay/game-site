@@ -491,36 +491,6 @@
         #playerNameInput:focus { border-color: #4da6ff; }
         #playerNameInput::placeholder { color: rgba(255,255,255,0.3); }
 
-        #tapTest {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 12px;
-        }
-        #tapTest span {
-            color: rgba(255,255,255,0.4);
-            font-size: 0.6em;
-            font-weight: 800;
-            letter-spacing: 1px;
-        }
-        .tap-test-btn {
-            width: 38px;
-            height: 38px;
-            border-radius: 12px;
-            border: 2px solid rgba(255,255,255,0.15);
-            background: rgba(255,255,255,0.06);
-            color: #fff;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 900;
-            font-size: 0.95em;
-            cursor: pointer;
-        }
-        .tap-test-btn:active {
-            transform: scale(0.92);
-            border-color: #4da6ff;
-            background: rgba(77,166,255,0.15);
-        }
 
         #rankSummary {
             text-align: center;
@@ -729,12 +699,6 @@
                 </div>
                 
                 <button class="btn btn-primary" id="startBtn">PLAY</button>
-                <div id="tapTest">
-                    <span>TAP SOUND</span>
-                    <button class="tap-test-btn" data-tap="A">A</button>
-                    <button class="tap-test-btn" data-tap="B">B</button>
-                    <button class="tap-test-btn" data-tap="C">C</button>
-                </div>
                 <div style="font-size:0.58em; color:rgba(255,255,255,0.3); margin-top:12px; text-align:center; line-height:1.4;">Your name and score are saved online for rankings.</div>
                 <div style="font-size:0.6em; color:rgba(255,255,255,0.35); margin-top:6px; text-align:center;">Music: Geometric Memory — HTb-music (Pixabay)</div>
             </div>
@@ -1492,48 +1456,10 @@
                 source.stop(startTime + duration + 0.04);
             },
 
-            playTap() {
-                const wobble = (Math.random() * 2 - 1) * 14;
-                const base = 500 + wobble;
-                // Single smooth sine blip: no noise burst, fewer nodes, click-free
-                // envelope so rapid tapping on mobile speakers stays clean.
-                this.voice({
-                    frequency: base,
-                    toFrequency: base * 1.04,
-                    duration: 0.05,
-                    type: 'sine',
-                    gain: 0.011,
-                    attack: 0.006,
-                    release: 0.045,
-                    filterType: 'lowpass',
-                    filterFrequency: 2000,
-                    filterQ: 0.4
-                });
-            },
-
-            // --- Tap sound candidates (no noise, click-free, light) ---
-            playTapA() { // Pop: bright coin-like
-                const base = 540 + (Math.random() * 2 - 1) * 16;
-                this.voice({ frequency: base, toFrequency: base * 1.5, duration: 0.04, type: 'triangle', gain: 0.012, attack: 0.003, release: 0.03, filterType: 'lowpass', filterFrequency: 3200, filterQ: 0.5 });
-                this.voice({ start: 0.012, frequency: base * 2, toFrequency: base * 2.25, duration: 0.03, type: 'sine', gain: 0.005, attack: 0.002, release: 0.025, filterType: 'highpass', filterFrequency: 1500, filterQ: 0.6 });
-            },
-            playTapB() { // Bubble: rounded, cute
-                const base = 420 + (Math.random() * 2 - 1) * 14;
-                this.voice({ frequency: base * 0.8, toFrequency: base * 1.28, duration: 0.055, type: 'sine', gain: 0.014, attack: 0.004, release: 0.045, filterType: 'lowpass', filterFrequency: 1800, filterQ: 0.6 });
-                this.voice({ start: 0.01, frequency: base * 1.9, toFrequency: base * 2.05, duration: 0.025, type: 'sine', gain: 0.0045, attack: 0.003, release: 0.02, filterType: 'lowpass', filterFrequency: 2600, filterQ: 0.5 });
-            },
-            playTapC() { // Arcade: retro rising sweep
+            playTap() { // Arcade: retro rising sweep
                 const base = 380 + (Math.random() * 2 - 1) * 12;
                 this.voice({ frequency: base, toFrequency: base * 2.6, duration: 0.05, type: 'triangle', gain: 0.011, attack: 0.002, release: 0.035, filterType: 'lowpass', filterFrequency: 3000, filterQ: 0.4 });
                 this.voice({ start: 0.0, frequency: base * 1.5, toFrequency: base * 3.2, duration: 0.04, type: 'square', gain: 0.0032, attack: 0.002, release: 0.03, filterType: 'lowpass', filterFrequency: 2400, filterQ: 0.5 });
-            },
-            testTap(which) {
-                this.unlock();
-                const ctx = this.ensureContext();
-                if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
-                if (which === 'A') this.playTapA();
-                else if (which === 'B') this.playTapB();
-                else this.playTapC();
             },
             playSuccess() {
                 this.voice({
@@ -2380,14 +2306,6 @@
             if (saved && ui.playerNameInput) ui.playerNameInput.value = saved;
         })();
 
-        // tap-sound test buttons (start screen)
-        document.querySelectorAll('.tap-test-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                SoundManager.testTap(btn.dataset.tap);
-            });
-        });
 
         ui.muteBtn.addEventListener('click', (e) => {
             e.preventDefault();
