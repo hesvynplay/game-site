@@ -1456,40 +1456,21 @@
             },
 
             playTap() {
-                const wobble = (Math.random() * 2 - 1) * 18;
-                const base = 520 + wobble;
+                const wobble = (Math.random() * 2 - 1) * 14;
+                const base = 500 + wobble;
+                // Single smooth sine blip: no noise burst, fewer nodes, click-free
+                // envelope so rapid tapping on mobile speakers stays clean.
                 this.voice({
                     frequency: base,
-                    toFrequency: base * 1.08,
-                    duration: 0.028,
-                    type: 'triangle',
-                    gain: 0.008,
-                    attack: 0.002,
-                    release: 0.012,
-                    filterType: 'lowpass',
-                    filterFrequency: 2600,
-                    filterQ: 0.55
-                });
-                this.voice({
-                    start: 0.004,
-                    frequency: base * 1.52,
-                    toFrequency: base * 1.46,
-                    duration: 0.014,
+                    toFrequency: base * 1.04,
+                    duration: 0.05,
                     type: 'sine',
-                    gain: 0.0028,
-                    attack: 0.001,
-                    release: 0.008,
-                    filterType: 'highpass',
-                    filterFrequency: 1100,
-                    filterQ: 0.7
-                });
-                this.noise({
-                    start: 0.001,
-                    duration: 0.008,
-                    gain: 0.0018,
-                    filterType: 'bandpass',
-                    filterFrequency: 2200,
-                    filterQ: 1.2
+                    gain: 0.011,
+                    attack: 0.006,
+                    release: 0.045,
+                    filterType: 'lowpass',
+                    filterFrequency: 2000,
+                    filterQ: 0.4
                 });
             },
             playSuccess() {
