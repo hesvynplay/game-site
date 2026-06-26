@@ -422,22 +422,29 @@
         #rankingList {
             background: rgba(255,255,255,0.04);
             border-radius: 14px;
-            padding: 10px;
-            margin: 14px 0;
+            padding: 8px;
+            margin: 10px 0;
             text-align: left;
+            max-height: 240px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .ranking-item {
             display: flex;
-            justify-content: space-between;
-            padding: 8px 6px;
+            align-items: center;
+            padding: 7px 6px;
             color: #fff;
             font-weight: 800;
             border-bottom: 1px solid rgba(255,255,255,0.06);
-            font-size: 0.95em;
+            font-size: 0.9em;
         }
         .ranking-item:last-child { border-bottom: none; }
-        .ranking-item.current { background: rgba(77, 166, 255, 0.12); border-radius: 8px; }
-        .rank { font-weight: 900; width: 36px; }
+        .ranking-item.current {
+            background: rgba(77, 166, 255, 0.18);
+            border-radius: 8px;
+            box-shadow: 0 0 0 2px rgba(77,166,255,0.5) inset;
+        }
+        .rank { font-weight: 900; width: 42px; flex-shrink: 0; }
         .rank-1 { color: #ffdd33; }
         .rank-2 { color: #c0c0c0; }
         .rank-3 { color: #cd7f32; }
@@ -449,46 +456,41 @@
             margin: 0 8px;
             color: #d8d8e8;
         }
-        .ranking-item .r-score { font-weight: 900; color: #fff; }
+        .ranking-item.current .r-name { color: #fff; }
+        .ranking-item .r-score { font-weight: 900; color: #fff; flex-shrink: 0; }
 
-        #nameEntry {
-            display: flex;
-            gap: 8px;
-            margin: 14px 0 6px;
-        }
-        #nameInput {
-            flex: 1;
+        #playerNameInput {
+            width: 100%;
             background: rgba(255,255,255,0.06);
             border: 2px solid rgba(255,255,255,0.15);
             border-radius: 12px;
-            padding: 12px 14px;
+            padding: 13px 14px;
             color: #fff;
             font-family: 'Montserrat', sans-serif;
             font-weight: 700;
             font-size: 0.9em;
             outline: none;
-            min-width: 0;
+            margin-bottom: 4px;
         }
-        #nameInput:focus { border-color: #4da6ff; }
-        #submitScoreBtn {
-            border: none;
-            background: linear-gradient(135deg, #4da6ff, #3333ff);
-            color: #fff;
+        #playerNameInput:focus { border-color: #4da6ff; }
+        #playerNameInput::placeholder { color: rgba(255,255,255,0.3); }
+
+        #rankSummary {
+            text-align: center;
             font-weight: 900;
-            border-radius: 12px;
-            padding: 0 18px;
-            cursor: pointer;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.85em;
-            white-space: nowrap;
+            font-size: 1em;
+            letter-spacing: 1px;
+            color: #4da6ff;
+            margin: 12px 0 2px;
+            min-height: 20px;
         }
-        #submitScoreBtn:disabled { opacity: 0.5; cursor: default; }
+        #rankSummary.out { color: #ff8888; }
 
         .rank-tabs {
             display: flex;
             flex-direction: column;
             gap: 6px;
-            margin-top: 10px;
+            margin-top: 8px;
         }
         .rank-tab-group {
             display: flex;
@@ -499,26 +501,18 @@
             background: rgba(255,255,255,0.05);
             border: 2px solid transparent;
             border-radius: 10px;
-            padding: 7px 4px;
+            padding: 8px 4px;
             color: #9a9ab0;
             cursor: pointer;
             font-family: 'Montserrat', sans-serif;
-            font-size: 0.65em;
+            font-size: 0.7em;
             font-weight: 800;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
         }
         .rank-tab.active {
             color: #fff;
             border-color: #4da6ff;
             background: rgba(77, 166, 255, 0.12);
-        }
-        #rankingStatus {
-            color: rgba(255,255,255,0.5);
-            font-size: 0.62em;
-            font-weight: 700;
-            text-align: center;
-            margin-top: 6px;
-            min-height: 14px;
         }
     </style>
 </head>
@@ -555,6 +549,9 @@
                 <h1 style="background: linear-gradient(90deg, #ff4d4d, #4da6ff, #ffdd33); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">COLOR<br>BRIDGE</h1>
                 <p class="subtitle">TAP TO SWITCH COLORS</p>
                 
+                <div class="section-title">NAME</div>
+                <input id="playerNameInput" type="text" maxlength="20" placeholder="ENTER NAME (OPTIONAL)" autocomplete="off">
+
                 <div class="section-title">MODE</div>
                 <div class="mode-grid">
                     <button class="mode-btn active" data-mode="classic"><span class="mode-icon">⚡</span>CLASSIC</button>
@@ -580,22 +577,14 @@
                     <div class="stat-box"><div class="stat-value" id="statBlocks">0</div><div class="stat-label">BLOCKS</div></div>
                 </div>
                 
-                <div id="nameEntry">
-                    <input id="nameInput" type="text" maxlength="20" placeholder="NICKNAME" autocomplete="off">
-                    <button id="submitScoreBtn">SUBMIT</button>
-                </div>
+                <div id="rankSummary">—</div>
                 <div class="rank-tabs">
                     <div class="rank-tab-group">
                         <button class="rank-tab period-tab active" data-period="daily">DAILY</button>
                         <button class="rank-tab period-tab" data-period="weekly">WEEKLY</button>
                     </div>
-                    <div class="rank-tab-group">
-                        <button class="rank-tab rmode-tab active" data-rmode="classic">CLASSIC</button>
-                        <button class="rank-tab rmode-tab" data-rmode="hard">HARD</button>
-                    </div>
                 </div>
                 <div id="rankingList"></div>
-                <div id="rankingStatus"></div>
                 
                 <button class="btn btn-primary" id="restartBtn">RETRY</button>
                 <button class="btn btn-secondary" id="menuBtn" style="margin-top:10px">MENU</button>
@@ -641,10 +630,8 @@
             recoveryGaugeFill: document.getElementById('recoveryGaugeFill'),
             recoveryGaugeText: document.getElementById('recoveryGaugeText'),
             rankingList: document.getElementById('rankingList'),
-            nameEntry: document.getElementById('nameEntry'),
-            nameInput: document.getElementById('nameInput'),
-            submitScoreBtn: document.getElementById('submitScoreBtn'),
-            rankingStatus: document.getElementById('rankingStatus')
+            playerNameInput: document.getElementById('playerNameInput'),
+            rankSummary: document.getElementById('rankSummary')
         };
         const stats = {
             level: document.getElementById('statLevel'),
@@ -698,8 +685,9 @@
             console.warn('Supabase init failed:', e);
             sbClient = null;
         }
-        let rankView = { period: 'daily', mode: 'classic' };
-        let scoreSubmitted = false;
+        let rankPeriod = 'daily';
+        let playerName = '';
+        let lastScoreId = null;
         
         function getLevelConfig(level) {
             const manual = [
@@ -1564,6 +1552,7 @@
         
         function startGame() {
             state = 'playing';
+            playerName = resolvePlayerName();
             COLORS = (selectedMode === 'hard') ? HARD_COLORS : THEMES[currentTheme];
             isPaused = false;
             score = 0;
@@ -1707,7 +1696,7 @@
             stats.maxCombo.textContent = maxCombo;
             stats.blocks.textContent = blocksCleared;
             
-            initRankingPanel();
+            submitAndShowRanking();
             ui.scoreCenter.classList.add('hidden');
             ui.topBar.classList.add('hidden');
             ui.pauseBtn.classList.add('hidden');
@@ -1727,13 +1716,11 @@
         
         function periodStartISO(period) {
             const now = new Date();
-            if (period === 'daily') {
-                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-                return d.toISOString();
+            if (period === 'weekly') {
+                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
             }
-            // weekly = last 7 days
-            const d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            return d.toISOString();
+            // daily = since local midnight
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
         }
 
         function escapeHtml(str) {
@@ -1742,118 +1729,119 @@
             })[c]);
         }
 
-        function setRankingStatus(msg) {
-            if (ui.rankingStatus) ui.rankingStatus.textContent = msg || '';
+        function resolvePlayerName() {
+            let name = ((ui.playerNameInput && ui.playerNameInput.value) || '').trim().slice(0, 20);
+            if (name.length === 0) {
+                // reuse a stable anon name for this device, or make a new one
+                name = localStorage.getItem('colorBridgeAnonName') || '';
+                if (!name) {
+                    name = 'anon' + Math.floor(1000 + Math.random() * 9000);
+                    localStorage.setItem('colorBridgeAnonName', name);
+                }
+            } else {
+                localStorage.setItem('colorBridgeName', name);
+            }
+            return name;
         }
 
-        function renderRankingRows(rows, highlightId) {
+        function renderRankingRows(rows, selfId) {
             ui.rankingList.innerHTML = '';
             if (!rows || rows.length === 0) {
-                ui.rankingList.innerHTML = '<div class="ranking-item"><span class="rank">-</span><span class="r-name">まだ記録がないよ</span><span class="r-score">-</span></div>';
-                return;
+                ui.rankingList.innerHTML = '<div class="ranking-item"><span class="rank">—</span><span class="r-name"></span><span class="r-score"></span></div>';
+                return -1;
             }
-            const top = rows.slice(0, 10);
-            for (let i = 0; i < top.length; i++) {
-                const r = top[i];
+            let selfRank = -1;
+            let selfEl = null;
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i];
                 const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
-                const label = (i + 1) + (i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th');
-                const isCurrent = highlightId != null && r.id === highlightId;
-                ui.rankingList.innerHTML +=
-                    `<div class="ranking-item ${isCurrent ? 'current' : ''}">` +
-                    `<span class="rank ${rankClass}">${label}</span>` +
+                const isSelf = selfId != null && r.id === selfId;
+                if (isSelf) selfRank = i + 1;
+                const div = document.createElement('div');
+                div.className = 'ranking-item' + (isSelf ? ' current' : '');
+                div.innerHTML =
+                    `<span class="rank ${rankClass}">${i + 1}</span>` +
                     `<span class="r-name">${escapeHtml(r.name)}</span>` +
-                    `<span class="r-score">${r.score}</span></div>`;
+                    `<span class="r-score">${r.score}</span>`;
+                frag.appendChild(div);
+                if (isSelf) selfEl = div;
+            }
+            ui.rankingList.appendChild(frag);
+            if (selfEl) {
+                // auto-scroll so the player's row sits in the middle of the list
+                requestAnimationFrame(() => {
+                    const target = selfEl.offsetTop - ui.rankingList.clientHeight / 2 + selfEl.clientHeight / 2;
+                    ui.rankingList.scrollTop = Math.max(0, target);
+                });
+            }
+            return selfRank;
+        }
+
+        function setRankSummary(selfRank) {
+            const label = rankPeriod === 'daily' ? 'DAILY' : 'WEEKLY';
+            if (selfRank > 0) {
+                ui.rankSummary.classList.remove('out');
+                ui.rankSummary.textContent = `${label}  #${selfRank}`;
+            } else {
+                ui.rankSummary.classList.add('out');
+                ui.rankSummary.textContent = `${label}  OUT OF RANK`;
             }
         }
 
-        async function fetchAndRenderRanking(highlightId) {
+        async function fetchAndRenderRanking() {
             if (!sbClient) {
                 ui.rankingList.innerHTML = '';
-                setRankingStatus('オフライン：ランキングに接続できないよ');
+                ui.rankSummary.textContent = '—';
+                ui.rankSummary.classList.remove('out');
                 return;
             }
-            setRankingStatus('読み込み中…');
+            ui.rankSummary.textContent = '...';
+            ui.rankSummary.classList.remove('out');
             try {
                 const { data, error } = await sbClient
                     .from('scores')
-                    .select('id, name, score, created_at')
-                    .eq('mode', rankView.mode)
-                    .gte('created_at', periodStartISO(rankView.period))
+                    .select('id, name, score')
+                    .eq('mode', selectedMode)
+                    .gte('created_at', periodStartISO(rankPeriod))
                     .order('score', { ascending: false })
-                    .limit(10);
+                    .order('created_at', { ascending: true })
+                    .limit(100);
                 if (error) throw error;
-                renderRankingRows(data, highlightId);
-                const periodLabel = rankView.period === 'daily' ? '本日' : '週間';
-                const modeLabel = rankView.mode.toUpperCase();
-                setRankingStatus(`${periodLabel} / ${modeLabel} TOP10`);
+                const selfRank = renderRankingRows(data, lastScoreId);
+                setRankSummary(selfRank);
             } catch (e) {
                 console.warn('fetch ranking failed:', e);
                 ui.rankingList.innerHTML = '';
-                setRankingStatus('ランキングの取得に失敗したよ');
-            }
-        }
-
-        async function submitScore() {
-            if (!sbClient) {
-                setRankingStatus('オフライン：送信できないよ');
-                return;
-            }
-            if (scoreSubmitted) return;
-            const name = (ui.nameInput.value || '').trim().slice(0, 20);
-            if (name.length < 1) {
-                setRankingStatus('ニックネームを入れてね');
-                ui.nameInput.focus();
-                return;
-            }
-            ui.submitScoreBtn.disabled = true;
-            setRankingStatus('送信中…');
-            try {
-                localStorage.setItem('colorBridgeName', name);
-                const { data, error } = await sbClient
-                    .from('scores')
-                    .insert({ name, score, mode: selectedMode })
-                    .select('id')
-                    .single();
-                if (error) throw error;
-                scoreSubmitted = true;
-                ui.nameEntry.style.display = 'none';
-                // show the board for the mode/period the player just competed in
-                rankView.mode = (selectedMode === 'hard') ? 'hard' : 'classic';
-                updateRankTabsUI();
-                await fetchAndRenderRanking(data ? data.id : null);
-            } catch (e) {
-                console.warn('submit score failed:', e);
-                ui.submitScoreBtn.disabled = false;
-                setRankingStatus('送信に失敗したよ。もう一度試してね');
+                ui.rankSummary.textContent = '—';
             }
         }
 
         function updateRankTabsUI() {
             document.querySelectorAll('.period-tab').forEach(b => {
-                b.classList.toggle('active', b.dataset.period === rankView.period);
-            });
-            document.querySelectorAll('.rmode-tab').forEach(b => {
-                b.classList.toggle('active', b.dataset.rmode === rankView.mode);
+                b.classList.toggle('active', b.dataset.period === rankPeriod);
             });
         }
 
-        function initRankingPanel() {
-            scoreSubmitted = false;
-            // default view = the mode just played, daily
-            rankView.period = 'daily';
-            rankView.mode = (selectedMode === 'hard') ? 'hard' : 'classic';
+        async function submitAndShowRanking() {
+            lastScoreId = null;
+            rankPeriod = 'daily';
             updateRankTabsUI();
 
             const rankable = (selectedMode === 'classic' || selectedMode === 'hard');
             if (sbClient && rankable) {
-                ui.nameEntry.style.display = 'flex';
-                ui.submitScoreBtn.disabled = false;
-                const savedName = localStorage.getItem('colorBridgeName') || '';
-                ui.nameInput.value = savedName;
-            } else {
-                ui.nameEntry.style.display = 'none';
+                try {
+                    const { data, error } = await sbClient
+                        .from('scores')
+                        .insert({ name: playerName, score, mode: selectedMode })
+                        .select('id')
+                        .single();
+                    if (!error && data) lastScoreId = data.id;
+                } catch (e) {
+                    console.warn('submit score failed:', e);
+                }
             }
-            fetchAndRenderRanking(null);
+            fetchAndRenderRanking();
         }
         
         function checkLevelUp() {
@@ -2028,24 +2016,18 @@
         document.getElementById('pauseBtn').addEventListener('click', pauseGame);
 
         // --- Online ranking listeners ---
-        ui.submitScoreBtn.addEventListener('click', submitScore);
-        ui.nameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); submitScore(); }
-        });
         document.querySelectorAll('.period-tab').forEach(btn => {
             btn.addEventListener('click', () => {
-                rankView.period = btn.dataset.period;
+                rankPeriod = btn.dataset.period;
                 updateRankTabsUI();
-                fetchAndRenderRanking(null);
+                fetchAndRenderRanking();
             });
         });
-        document.querySelectorAll('.rmode-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
-                rankView.mode = btn.dataset.rmode;
-                updateRankTabsUI();
-                fetchAndRenderRanking(null);
-            });
-        });
+        // restore last used name into the start-screen input
+        (function () {
+            const saved = localStorage.getItem('colorBridgeName') || '';
+            if (saved && ui.playerNameInput) ui.playerNameInput.value = saved;
+        })();
 
         ui.muteBtn.addEventListener('click', (e) => {
             e.preventDefault();
