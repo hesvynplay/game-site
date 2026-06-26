@@ -723,6 +723,110 @@
             from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.85); }
             to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
         }
+
+        /* Achievement unlock toast */
+        #achToast {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            background: rgba(20,20,28,0.96);
+            border: 2px solid #ffd54a;
+            color: #fff;
+            padding: 11px 18px;
+            border-radius: 16px;
+            font-size: 0.72em;
+            font-weight: 700;
+            line-height: 1.3;
+            white-space: nowrap;
+            z-index: 46;
+            pointer-events: none;
+            box-shadow: 0 6px 30px rgba(0,0,0,0.5);
+            animation: dailyToastIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        #achToast .ach-toast-ic { font-size: 1.8em; }
+        #achToast b { font-size: 0.85em; letter-spacing: 1px; color: #ffd54a; }
+
+        /* New badges on game over */
+        #achNew {
+            margin: 4px auto 10px;
+            padding: 10px 14px;
+            border-radius: 14px;
+            background: rgba(255,213,74,0.08);
+            border: 1px solid rgba(255,213,74,0.3);
+            max-width: 320px;
+        }
+        .ach-new-title { color: #ffd54a; font-weight: 900; font-size: 0.72em; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .ach-new-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .ach-new-badge {
+            width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3em;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            border: 2px solid var(--tc, #ffd54a);
+            box-shadow: 0 0 14px color-mix(in srgb, var(--tc, #ffd54a) 45%, transparent);
+        }
+
+        /* Achievements full screen */
+        #achScreen {
+            position: absolute;
+            inset: 0;
+            background: #0a0a12;
+            z-index: 60;
+            display: flex;
+            flex-direction: column;
+            padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
+            box-sizing: border-box;
+        }
+        #achHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        #achHeader span { color: #fff; font-weight: 900; font-size: 1.1em; letter-spacing: 2px; }
+        #achClose {
+            width: 38px; height: 38px; border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.06); color: #fff;
+            font-size: 1em; font-weight: 900; cursor: pointer;
+        }
+        #achProgWrap { margin-bottom: 16px; }
+        .ach-prog-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+        #achProgText { color: #fff; font-weight: 900; font-size: 1.1em; }
+        #achProgPct { color: #00e676; font-weight: 900; font-size: 1.3em; }
+        .ach-prog-bar { width: 100%; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); overflow: hidden; }
+        #achProgFill { height: 100%; width: 0%; border-radius: 5px; background: linear-gradient(90deg, #4da6ff, #00e676); transition: width 0.5s ease; }
+        #achGrid { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .ach-cat-head {
+            color: rgba(255,255,255,0.55); font-weight: 900; font-size: 0.7em;
+            letter-spacing: 1.5px; margin: 14px 2px 8px;
+        }
+        .ach-cat-head span { color: rgba(255,255,255,0.35); }
+        .ach-cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .ach-item {
+            display: flex; align-items: center; gap: 9px;
+            padding: 9px 10px; border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            opacity: 0.55;
+        }
+        .ach-item.got {
+            opacity: 1;
+            border-color: var(--tc);
+            background: color-mix(in srgb, var(--tc) 12%, transparent);
+        }
+        .ach-ic {
+            font-size: 1.4em; filter: grayscale(1) brightness(0.8);
+            width: 26px; text-align: center; flex-shrink: 0;
+        }
+        .ach-item.got .ach-ic { filter: none; }
+        .ach-info { min-width: 0; }
+        .ach-name { color: #fff; font-weight: 800; font-size: 0.66em; line-height: 1.15; }
+        .ach-hint { color: rgba(255,255,255,0.45); font-weight: 700; font-size: 0.58em; margin-top: 2px; }
+        .ach-item.got .ach-hint { color: var(--tc); }
     </style>
 </head>
 <body>
@@ -767,6 +871,19 @@
             <div id="tutFreezeCont">TAP to continue</div>
         </div>
         <div id="dailyToast" class="hidden"></div>
+        <div id="achToast" class="hidden"></div>
+
+        <div id="achScreen" class="hidden">
+            <div id="achHeader">
+                <span>ACHIEVEMENTS</span>
+                <button id="achClose">✕</button>
+            </div>
+            <div id="achProgWrap">
+                <div class="ach-prog-top"><span id="achProgText">0 / 0</span><span id="achProgPct">0%</span></div>
+                <div class="ach-prog-bar"><div id="achProgFill"></div></div>
+            </div>
+            <div id="achGrid"></div>
+        </div>
 
         <div id="ui">
             <div id="startScreen" class="screen">
@@ -794,6 +911,7 @@
                 </div>
 
                 <button class="btn btn-primary" id="startBtn">PLAY</button>
+                <button class="btn btn-secondary" id="achBtn" style="margin-top:10px"><span id="achBtnLabel">ACHIEVEMENTS  0%</span></button>
                 <div style="font-size:0.58em; color:rgba(255,255,255,0.3); margin-top:12px; text-align:center; line-height:1.4;">Your name and score are saved online for rankings.</div>
                 <div style="font-size:0.6em; color:rgba(255,255,255,0.35); margin-top:6px; text-align:center;">Music: Geometric Memory — HTb-music (Pixabay)</div>
             </div>
@@ -805,6 +923,7 @@
                     <div id="scoreDiff" style="font-weight:900; font-size:0.9em; opacity:0;"></div>
                     <div id="bestLabel" style="color: #ffd700; font-weight: 900; font-size: 0.85em; opacity: 0;">NEW BEST!</div>
                 </div>
+                <div id="achNew" class="hidden"></div>
                 
                 <div class="stats-row">
                     <div class="stat-box"><div class="stat-value" id="statLevel">1</div><div class="stat-label">LEVEL</div></div>
@@ -877,7 +996,16 @@
             dailyText: document.getElementById('dailyText'),
             dailyProg: document.getElementById('dailyProg'),
             dailyBarFill: document.getElementById('dailyBarFill'),
-            dailyToast: document.getElementById('dailyToast')
+            dailyToast: document.getElementById('dailyToast'),
+            achBtn: document.getElementById('achBtn'),
+            achBtnLabel: document.getElementById('achBtnLabel'),
+            achScreen: document.getElementById('achScreen'),
+            achGrid: document.getElementById('achGrid'),
+            achProgText: document.getElementById('achProgText'),
+            achProgPct: document.getElementById('achProgPct'),
+            achProgFill: document.getElementById('achProgFill'),
+            achToast: document.getElementById('achToast'),
+            achNew: document.getElementById('achNew')
         };
         const stats = {
             level: document.getElementById('statLevel'),
@@ -1073,6 +1201,10 @@
         let combo = 0;
         let maxCombo = 0;
         let blocksCleared = 0;
+        let runHeavy = 0;
+        let runZebra = 0;
+        let runFever = 0;
+        let runRainbow = 0;
         let currentColorIndex = 0;
         let lives = 3;
         let maxLives = 3;
@@ -1914,6 +2046,8 @@
             if (!dailyState.done && dailyState.progress >= ch.target) {
                 dailyState.done = true;
                 saveDaily();
+                achStats.dailyDone = (achStats.dailyDone || 0) + 1;
+                saveAchStats();
                 showChallengeComplete(ch);
                 refreshDailyUI();
             }
@@ -1960,6 +2094,208 @@
             challengeToastTimer = setTimeout(() => ui.dailyToast.classList.add('hidden'), 2600);
         }
 
+        // ===== Achievements system =====
+        let achStats = {
+            plays: 0, totalScore: 0, totalMatches: 0,
+            heavyDestroyed: 0, zebraMatched: 0,
+            feverCount: 0, rainbowCount: 0,
+            bestClassic: 0, bestHard: 0,
+            maxCombo: 0, maxLevel: 0, dailyDone: 0
+        };
+        let achUnlocked = []; // array of unlocked achievement ids
+
+        function loadAchStats() {
+            try {
+                const s = JSON.parse(localStorage.getItem('colorBridgeStats'));
+                if (s) achStats = Object.assign(achStats, s);
+            } catch (e) {}
+            try {
+                achUnlocked = JSON.parse(localStorage.getItem('colorBridgeAch')) || [];
+            } catch (e) { achUnlocked = []; }
+        }
+        function saveAchStats() {
+            try { localStorage.setItem('colorBridgeStats', JSON.stringify(achStats)); } catch (e) {}
+        }
+        function saveAchUnlocked() {
+            try { localStorage.setItem('colorBridgeAch', JSON.stringify(achUnlocked)); } catch (e) {}
+        }
+
+        // Tier colors: bronze / silver / gold / legendary(purple)
+        const ACH_TIERS = { bronze: '#cd7f32', silver: '#c2cad6', gold: '#ffd54a', legend: '#b14dff' };
+
+        // stat key resolver (bestScore = best of either mode)
+        function achStatValue(key) {
+            if (key === 'bestScore') return Math.max(achStats.bestClassic || 0, achStats.bestHard || 0);
+            return achStats[key] || 0;
+        }
+
+        // 30 achievements (staged). cat groups for display.
+        const ACHIEVEMENTS = [
+            // Score
+            { id: 'sc100',  cat: 'Score',  stat: 'bestScore', target: 100,  icon: '🎯', name: 'Getting Started', tier: 'bronze' },
+            { id: 'sc300',  cat: 'Score',  stat: 'bestScore', target: 300,  icon: '🎯', name: 'Warmed Up',       tier: 'bronze' },
+            { id: 'sc500',  cat: 'Score',  stat: 'bestScore', target: 500,  icon: '🎯', name: 'Sharp Shooter',   tier: 'silver' },
+            { id: 'sc1000', cat: 'Score',  stat: 'bestScore', target: 1000, icon: '🏆', name: 'Four Digits',     tier: 'silver' },
+            { id: 'sc2000', cat: 'Score',  stat: 'bestScore', target: 2000, icon: '🏆', name: 'Score Machine',   tier: 'gold' },
+            { id: 'sc3500', cat: 'Score',  stat: 'bestScore', target: 3500, icon: '👑', name: 'Bridge Legend',   tier: 'legend' },
+            // Combo
+            { id: 'cb5',   cat: 'Combo',  stat: 'maxCombo', target: 5,   icon: '🔥', name: 'On a Roll',     tier: 'bronze' },
+            { id: 'cb10',  cat: 'Combo',  stat: 'maxCombo', target: 10,  icon: '🔥', name: 'Combo Starter', tier: 'bronze' },
+            { id: 'cb25',  cat: 'Combo',  stat: 'maxCombo', target: 25,  icon: '🔥', name: 'Chain Master',  tier: 'silver' },
+            { id: 'cb50',  cat: 'Combo',  stat: 'maxCombo', target: 50,  icon: '⚡', name: 'Unstoppable',   tier: 'gold' },
+            { id: 'cb75',  cat: 'Combo',  stat: 'maxCombo', target: 75,  icon: '⚡', name: 'Combo Beast',   tier: 'gold' },
+            { id: 'cb100', cat: 'Combo',  stat: 'maxCombo', target: 100, icon: '💫', name: 'Century Chain', tier: 'legend' },
+            // Plays
+            { id: 'pl1',  cat: 'Plays', stat: 'plays', target: 1,  icon: '🎮', name: 'First Steps',  tier: 'bronze' },
+            { id: 'pl5',  cat: 'Plays', stat: 'plays', target: 5,  icon: '🎮', name: 'Getting Hooked', tier: 'bronze' },
+            { id: 'pl10', cat: 'Plays', stat: 'plays', target: 10, icon: '🎮', name: 'Regular',       tier: 'silver' },
+            { id: 'pl25', cat: 'Plays', stat: 'plays', target: 25, icon: '🎲', name: 'Dedicated',     tier: 'silver' },
+            { id: 'pl50', cat: 'Plays', stat: 'plays', target: 50, icon: '🎲', name: 'Addicted',      tier: 'gold' },
+            // Heavy
+            { id: 'hv1',  cat: 'Heavy', stat: 'heavyDestroyed', target: 1,  icon: '🧱', name: 'First Crush',   tier: 'bronze' },
+            { id: 'hv10', cat: 'Heavy', stat: 'heavyDestroyed', target: 10, icon: '🧱', name: 'Wall Breaker',  tier: 'silver' },
+            { id: 'hv30', cat: 'Heavy', stat: 'heavyDestroyed', target: 30, icon: '🔨', name: 'Demolisher',    tier: 'gold' },
+            { id: 'hv75', cat: 'Heavy', stat: 'heavyDestroyed', target: 75, icon: '🔨', name: 'Wrecking Ball', tier: 'legend' },
+            // Zebra
+            { id: 'zb1',  cat: 'Zebra', stat: 'zebraMatched', target: 1,  icon: '🦓', name: 'Two-Tone',     tier: 'bronze' },
+            { id: 'zb25', cat: 'Zebra', stat: 'zebraMatched', target: 25, icon: '🦓', name: 'Color Splitter', tier: 'silver' },
+            { id: 'zb75', cat: 'Zebra', stat: 'zebraMatched', target: 75, icon: '🎨', name: 'Zebra Master',  tier: 'gold' },
+            // Level
+            { id: 'lv3', cat: 'Level', stat: 'maxLevel', target: 3, icon: '📈', name: 'Climbing',    tier: 'bronze' },
+            { id: 'lv5', cat: 'Level', stat: 'maxLevel', target: 5, icon: '📈', name: 'High Riser',  tier: 'silver' },
+            { id: 'lv7', cat: 'Level', stat: 'maxLevel', target: 7, icon: '🚀', name: 'Sky High',    tier: 'gold' },
+            // Special
+            { id: 'fv1', cat: 'Special', stat: 'feverCount', target: 1,  icon: '🌡️', name: 'Fever Pitch',  tier: 'bronze' },
+            { id: 'dl1', cat: 'Special', stat: 'dailyDone',  target: 1,  icon: '📅', name: 'Daily Doer',   tier: 'bronze' },
+            { id: 'dl5', cat: 'Special', stat: 'dailyDone',  target: 5,  icon: '📅', name: 'Streak Seeker', tier: 'silver' }
+        ];
+
+        function achProgress() {
+            const total = ACHIEVEMENTS.length;
+            const got = ACHIEVEMENTS.filter(a => achUnlocked.includes(a.id)).length;
+            return { got, total, pct: total ? Math.round((got / total) * 100) : 0 };
+        }
+
+        // check & unlock; returns array of newly unlocked achievement objects
+        function checkAchievements() {
+            const newly = [];
+            for (const a of ACHIEVEMENTS) {
+                if (achUnlocked.includes(a.id)) continue;
+                if (achStatValue(a.stat) >= a.target) {
+                    achUnlocked.push(a.id);
+                    newly.push(a);
+                }
+            }
+            if (newly.length) saveAchUnlocked();
+            return newly;
+        }
+
+        // accumulate this run's stats into persistent achStats (called at game over)
+        function commitRunStats() {
+            achStats.totalScore += score;
+            achStats.totalMatches += blocksCleared;
+            achStats.heavyDestroyed += runHeavy;
+            achStats.zebraMatched += runZebra;
+            achStats.feverCount += runFever;
+            achStats.rainbowCount += runRainbow;
+            if (maxCombo > achStats.maxCombo) achStats.maxCombo = maxCombo;
+            if (level > achStats.maxLevel) achStats.maxLevel = level;
+            if (selectedMode === 'classic' && score > achStats.bestClassic) achStats.bestClassic = score;
+            if (selectedMode === 'hard' && score > achStats.bestHard) achStats.bestHard = score;
+            saveAchStats();
+        }
+
+        let runCommitted = true; // no run in progress before first game
+        function commitAndCheck() {
+            if (runCommitted) return [];
+            commitRunStats();
+            runCommitted = true;
+            const newly = checkAchievements();
+            refreshAchButton();
+            return newly;
+        }
+
+        // ----- Achievements UI -----
+        let achToastQueue = [];
+        let achToastTimer = null;
+        function queueAchToasts(list) {
+            achToastQueue = achToastQueue.concat(list);
+            if (!achToastTimer) showNextAchToast();
+        }
+        function showNextAchToast() {
+            if (!ui.achToast || achToastQueue.length === 0) { achToastTimer = null; return; }
+            const a = achToastQueue.shift();
+            ui.achToast.innerHTML = '<span class="ach-toast-ic">' + a.icon + '</span>'
+                + '<span><b>ACHIEVEMENT UNLOCKED</b><br>' + a.name + '</span>';
+            ui.achToast.style.borderColor = ACH_TIERS[a.tier];
+            ui.achToast.classList.remove('hidden');
+            ui.achToast.style.animation = 'none';
+            void ui.achToast.offsetWidth;
+            ui.achToast.style.animation = '';
+            achToastTimer = setTimeout(() => {
+                ui.achToast.classList.add('hidden');
+                setTimeout(showNextAchToast, 250);
+            }, 2200);
+        }
+
+        function refreshAchButton() {
+            if (!ui.achBtnLabel) return;
+            const p = achProgress();
+            ui.achBtnLabel.textContent = 'ACHIEVEMENTS  ' + p.pct + '%';
+        }
+
+        function renderAchievements() {
+            if (!ui.achGrid) return;
+            const p = achProgress();
+            ui.achProgText.textContent = p.got + ' / ' + p.total;
+            ui.achProgPct.textContent = p.pct + '%';
+            ui.achProgFill.style.width = p.pct + '%';
+
+            const cats = [];
+            const byCat = {};
+            for (const a of ACHIEVEMENTS) {
+                if (!byCat[a.cat]) { byCat[a.cat] = []; cats.push(a.cat); }
+                byCat[a.cat].push(a);
+            }
+            let html = '';
+            for (const cat of cats) {
+                const items = byCat[cat];
+                const gotN = items.filter(a => achUnlocked.includes(a.id)).length;
+                html += '<div class="ach-cat-head">' + cat + ' <span>' + gotN + '/' + items.length + '</span></div>';
+                html += '<div class="ach-cat-grid">';
+                for (const a of items) {
+                    const got = achUnlocked.includes(a.id);
+                    const col = ACH_TIERS[a.tier];
+                    const cur = Math.min(achStatValue(a.stat), a.target);
+                    html += '<div class="ach-item' + (got ? ' got' : '') + '" style="' + (got ? '--tc:' + col : '') + '">'
+                        + '<div class="ach-ic">' + a.icon + '</div>'
+                        + '<div class="ach-info"><div class="ach-name">' + a.name + '</div>'
+                        + '<div class="ach-hint">' + (got ? 'UNLOCKED' : (cur + ' / ' + a.target)) + '</div></div>'
+                        + '</div>';
+                }
+                html += '</div>';
+            }
+            ui.achGrid.innerHTML = html;
+        }
+        function openAchievements() {
+            renderAchievements();
+            ui.achScreen.classList.remove('hidden');
+        }
+        function closeAchievements() {
+            ui.achScreen.classList.add('hidden');
+        }
+        function renderGameOverNewBadges(list) {
+            if (!ui.achNew) return;
+            if (!list || list.length === 0) { ui.achNew.classList.add('hidden'); ui.achNew.innerHTML = ''; return; }
+            let html = '<div class="ach-new-title">🏆 ' + list.length + ' NEW ACHIEVEMENT' + (list.length > 1 ? 'S' : '') + '!</div><div class="ach-new-row">';
+            for (const a of list) {
+                html += '<div class="ach-new-badge" style="--tc:' + ACH_TIERS[a.tier] + '" title="' + a.name + '">' + a.icon + '</div>';
+            }
+            html += '</div>';
+            ui.achNew.innerHTML = html;
+            ui.achNew.classList.remove('hidden');
+        }
+
         function startGame() {
             state = 'playing';
             playerName = resolvePlayerName();
@@ -1969,8 +2305,15 @@
             combo = 0;
             maxCombo = 0;
             blocksCleared = 0;
+            runHeavy = 0;
+            runZebra = 0;
+            runFever = 0;
+            runRainbow = 0;
             currentColorIndex = 0;
             dailyAdd('plays', 1);
+            achStats.plays += 1;
+            saveAchStats();
+            runCommitted = false;
             lives = selectedMode === 'zen' ? 99 : maxLives;
             level = 1;
             blocks = [];
@@ -2042,6 +2385,9 @@
             state = 'start';
             isPaused = false;
             hideAllTutorial();
+            const newlyAch = commitAndCheck();
+            if (newlyAch && newlyAch.length) queueAchToasts(newlyAch);
+            refreshAchButton();
             ui.scoreCenter.classList.add('hidden');
             ui.topBar.classList.add('hidden');
             ui.pauseBtn.classList.add('hidden');
@@ -2112,7 +2458,10 @@
             stats.level.textContent = level;
             stats.maxCombo.textContent = maxCombo;
             stats.blocks.textContent = blocksCleared;
-            
+
+            const newlyAch = commitAndCheck();
+            renderGameOverNewBadges(newlyAch);
+
             submitAndShowRanking();
             ui.scoreCenter.classList.add('hidden');
             ui.topBar.classList.add('hidden');
@@ -2509,6 +2858,12 @@
         loadDaily();
         refreshDailyUI();
 
+        // init achievements
+        loadAchStats();
+        refreshAchButton();
+        ui.achBtn.addEventListener('click', openAchievements);
+        document.getElementById('achClose').addEventListener('click', closeAchievements);
+
 
         ui.muteBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -2654,6 +3009,7 @@
                             updateHeavyBlockBadge(0);
                             blocksCleared++;
                             dailyAdd('heavy', 1);
+                            runHeavy++;
                             const heavyDestroyPoints = Math.floor(140 * mode.scoreMult);
                             score += heavyDestroyPoints;
                             ui.score.textContent = score;
@@ -2695,10 +3051,12 @@
                             feverActive = true;
                             feverTimer = 1;
                             ui.feverBadge.style.opacity = '1';
+                            runFever++;
                         }
 
                         if (combo > 0 && combo % 15 === 0 && !rainbowBridgeActive) {
                             rainbowBridgeActive = true;
+                            runRainbow++;
                             rainbowBridgeTimer = 300;
                             ui.rainbowBadge.style.opacity = '1';
                             addFloatingText('RAINBOW!', w / 2, bridgeY - 80, '#ffffff');
@@ -2713,7 +3071,7 @@
                         SoundManager.playSuccess();
                         updateRecoveryGauge(1);
                         checkLevelUp();
-                        if (b.type === 'zebra') dailyAdd('zebra', 1);
+                        if (b.type === 'zebra') { dailyAdd('zebra', 1); runZebra++; }
                         dailySetMax('score', score, selectedMode);
                         dailySetMax('combo', combo);
 
