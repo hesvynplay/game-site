@@ -639,6 +639,90 @@
             from { opacity: 0; transform: scale(0.7); }
             to   { opacity: 1; transform: scale(1); }
         }
+
+        #dailyCard {
+            width: 100%;
+            max-width: 320px;
+            margin: 16px auto 4px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-sizing: border-box;
+        }
+        #dailyCard.daily-done {
+            border-color: rgba(0,230,118,0.6);
+            background: rgba(0,230,118,0.08);
+        }
+        .daily-head {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 7px;
+        }
+        #dailyIcon { font-size: 1.1em; }
+        .daily-title {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.6em;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            flex: 1;
+            text-align: left;
+        }
+        #dailyProg {
+            color: #fff;
+            font-size: 0.62em;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+        }
+        #dailyCard.daily-done #dailyProg { color: #00e676; }
+        #dailyText {
+            color: #fff;
+            font-size: 0.82em;
+            font-weight: 800;
+            text-align: left;
+            margin-bottom: 9px;
+        }
+        .daily-bar {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        #dailyBarFill {
+            height: 100%;
+            width: 0%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #4da6ff, #00e676);
+            transition: width 0.4s ease;
+        }
+        #dailyCard.daily-done #dailyBarFill {
+            background: #00e676;
+        }
+
+        #dailyToast {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(90deg, #00e676, #00c853);
+            color: #06140b;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-weight: 900;
+            font-size: 0.95em;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            z-index: 45;
+            pointer-events: none;
+            box-shadow: 0 0 28px rgba(0,230,118,0.55);
+            animation: dailyToastIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes dailyToastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.85); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -682,6 +766,7 @@
             <div id="tutFreezeMsg"></div>
             <div id="tutFreezeCont">TAP to continue</div>
         </div>
+        <div id="dailyToast" class="hidden"></div>
 
         <div id="ui">
             <div id="startScreen" class="screen">
@@ -697,7 +782,17 @@
                     <button class="mode-btn" data-mode="hard"><span class="mode-icon">🔥</span>HARD</button>
                     <button class="mode-btn" data-mode="zen"><span class="mode-icon">🌿</span>ZEN</button>
                 </div>
-                
+
+                <div id="dailyCard">
+                    <div class="daily-head">
+                        <span id="dailyIcon">🎯</span>
+                        <span class="daily-title">TODAY'S CHALLENGE</span>
+                        <span id="dailyProg">0 / 0</span>
+                    </div>
+                    <div id="dailyText">—</div>
+                    <div class="daily-bar"><div id="dailyBarFill"></div></div>
+                </div>
+
                 <button class="btn btn-primary" id="startBtn">PLAY</button>
                 <div style="font-size:0.58em; color:rgba(255,255,255,0.3); margin-top:12px; text-align:center; line-height:1.4;">Your name and score are saved online for rankings.</div>
                 <div style="font-size:0.6em; color:rgba(255,255,255,0.35); margin-top:6px; text-align:center;">Music: Geometric Memory — HTb-music (Pixabay)</div>
@@ -776,7 +871,13 @@
             tutText: document.getElementById('tutText'),
             tutBanner: document.getElementById('tutBanner'),
             tutFreeze: document.getElementById('tutFreeze'),
-            tutFreezeMsg: document.getElementById('tutFreezeMsg')
+            tutFreezeMsg: document.getElementById('tutFreezeMsg'),
+            dailyCard: document.getElementById('dailyCard'),
+            dailyIcon: document.getElementById('dailyIcon'),
+            dailyText: document.getElementById('dailyText'),
+            dailyProg: document.getElementById('dailyProg'),
+            dailyBarFill: document.getElementById('dailyBarFill'),
+            dailyToast: document.getElementById('dailyToast')
         };
         const stats = {
             level: document.getElementById('statLevel'),
@@ -1769,6 +1870,96 @@
             if (name && screens[name]) screens[name].classList.remove('hidden');
         }
         
+        // ===== Daily Challenge system =====
+        const DAILY_CHALLENGES = [
+            { id: 'score_classic', type: 'score', mode: 'classic', target: 300, icon: '🎯', text: t => `Score ${t} in CLASSIC` },
+            { id: 'combo20',       type: 'combo',                  target: 20,  icon: '🔥', text: t => `Reach a ${t} combo` },
+            { id: 'heavy3',        type: 'heavy',                  target: 3,   icon: '🧱', text: t => `Destroy ${t} HEAVY blocks` },
+            { id: 'score_hard',    type: 'score', mode: 'hard',    target: 250, icon: '⚡', text: t => `Score ${t} in HARD` },
+            { id: 'zebra4',        type: 'zebra',                  target: 4,   icon: '🦓', text: t => `Match ${t} two-color blocks` },
+            { id: 'plays3',        type: 'plays',                  target: 3,   icon: '🎮', text: t => `Play ${t} games` },
+            { id: 'combo35',       type: 'combo',                  target: 35,  icon: '🌟', text: t => `Reach a ${t} combo` }
+        ];
+
+        function dailyTodayKey() {
+            const n = new Date();
+            return n.getUTCFullYear() + '-' + (n.getUTCMonth() + 1) + '-' + n.getUTCDate();
+        }
+        function dailyDayNumber() {
+            // whole UTC days since epoch
+            return Math.floor(Date.now() / 86400000);
+        }
+        function getTodayChallenge() {
+            const len = DAILY_CHALLENGES.length;
+            const idx = ((dailyDayNumber() % len) + len) % len;
+            return DAILY_CHALLENGES[idx];
+        }
+
+        let dailyState = null; // { dateKey, progress, done }
+        function loadDaily() {
+            try { dailyState = JSON.parse(localStorage.getItem('colorBridgeDaily')); } catch (e) { dailyState = null; }
+            rolloverDaily();
+        }
+        function rolloverDaily() {
+            const tk = dailyTodayKey();
+            if (!dailyState || dailyState.dateKey !== tk) {
+                dailyState = { dateKey: tk, progress: 0, done: false };
+                saveDaily();
+            }
+        }
+        function saveDaily() {
+            try { localStorage.setItem('colorBridgeDaily', JSON.stringify(dailyState)); } catch (e) {}
+        }
+        function finalizeDaily(ch) {
+            if (!dailyState.done && dailyState.progress >= ch.target) {
+                dailyState.done = true;
+                saveDaily();
+                showChallengeComplete(ch);
+                refreshDailyUI();
+            }
+        }
+        function dailyAdd(type, amount) {
+            rolloverDaily();
+            const ch = getTodayChallenge();
+            if (ch.type !== type || dailyState.done) return;
+            dailyState.progress += amount;
+            saveDaily();
+            finalizeDaily(ch);
+        }
+        function dailySetMax(type, value, mode) {
+            rolloverDaily();
+            const ch = getTodayChallenge();
+            if (ch.type !== type || dailyState.done) return;
+            if (ch.mode && ch.mode !== mode) return;
+            if (value > dailyState.progress) dailyState.progress = value;
+            finalizeDaily(ch);
+        }
+
+        function refreshDailyUI() {
+            if (!ui.dailyCard) return;
+            rolloverDaily();
+            const ch = getTodayChallenge();
+            const prog = Math.min(dailyState.progress, ch.target);
+            ui.dailyIcon.textContent = ch.icon;
+            ui.dailyText.textContent = ch.text(ch.target);
+            ui.dailyProg.textContent = dailyState.done ? 'DONE' : (prog + ' / ' + ch.target);
+            ui.dailyBarFill.style.width = Math.round((prog / ch.target) * 100) + '%';
+            ui.dailyCard.classList.toggle('daily-done', !!dailyState.done);
+        }
+
+        let challengeToastTimer = null;
+        function showChallengeComplete(ch) {
+            if (!ui.dailyToast) return;
+            ui.dailyToast.textContent = '✓ CHALLENGE COMPLETE!';
+            ui.dailyToast.classList.remove('hidden');
+            ui.dailyToast.style.animation = 'none';
+            void ui.dailyToast.offsetWidth;
+            ui.dailyToast.style.animation = '';
+            SoundManager.playSuccess();
+            if (challengeToastTimer) clearTimeout(challengeToastTimer);
+            challengeToastTimer = setTimeout(() => ui.dailyToast.classList.add('hidden'), 2600);
+        }
+
         function startGame() {
             state = 'playing';
             playerName = resolvePlayerName();
@@ -1779,6 +1970,7 @@
             maxCombo = 0;
             blocksCleared = 0;
             currentColorIndex = 0;
+            dailyAdd('plays', 1);
             lives = selectedMode === 'zen' ? 99 : maxLives;
             level = 1;
             blocks = [];
@@ -1864,6 +2056,7 @@
             const context = SoundManager.ensureContext();
             if (context && context.state === 'suspended') context.resume().catch(() => {});
             showScreen('start');
+            refreshDailyUI();
             SoundManager.playBgm();
             drawStartBackground();
         }
@@ -1871,6 +2064,7 @@
         function gameOver() {
             state = 'gameover';
             hideAllTutorial();
+            saveDaily();
             CG.gameplayStop();
             SoundManager.playGameOver();
             SoundManager.stopBgm();
@@ -1940,10 +2134,15 @@
         function periodStartISO(period) {
             const now = new Date();
             if (period === 'weekly') {
-                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+                // start of the current week: most recent Monday 00:00 UTC
+                const dow = now.getUTCDay(); // 0=Sun,1=Mon,...6=Sat
+                const daysSinceMonday = (dow + 6) % 7;
+                const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+                monday.setUTCDate(monday.getUTCDate() - daysSinceMonday);
+                return monday.toISOString();
             }
-            // daily = since local midnight
-            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+            // daily = since UTC midnight
+            return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)).toISOString();
         }
 
         function escapeHtml(str) {
@@ -2306,6 +2505,10 @@
             if (saved && ui.playerNameInput) ui.playerNameInput.value = saved;
         })();
 
+        // init daily challenge
+        loadDaily();
+        refreshDailyUI();
+
 
         ui.muteBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -2450,6 +2653,7 @@
                             heavyBlockCooldown = 0;
                             updateHeavyBlockBadge(0);
                             blocksCleared++;
+                            dailyAdd('heavy', 1);
                             const heavyDestroyPoints = Math.floor(140 * mode.scoreMult);
                             score += heavyDestroyPoints;
                             ui.score.textContent = score;
@@ -2509,6 +2713,9 @@
                         SoundManager.playSuccess();
                         updateRecoveryGauge(1);
                         checkLevelUp();
+                        if (b.type === 'zebra') dailyAdd('zebra', 1);
+                        dailySetMax('score', score, selectedMode);
+                        dailySetMax('combo', combo);
 
                         ui.combo.textContent = 'x' + combo;
                         ui.combo.style.opacity = combo >= 2 ? '1' : '0';
@@ -2657,6 +2864,8 @@
             });
             
             if (ui.score.textContent !== String(score)) ui.score.textContent = score;
+            dailySetMax('score', score, selectedMode);
+            dailySetMax('combo', combo);
             draw(w, h, bridgeY);
             if (pendingTutFreeze) {
                 const fb = pendingTutFreeze;
