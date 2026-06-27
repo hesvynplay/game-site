@@ -3109,8 +3109,11 @@
             if (name.length === 0) {
                 // reuse a stable anon name for this device, or make a new one
                 name = GameStorage.getItem(STORAGE_KEYS.anonName) || '';
+                if (!/^anon\d{8}$/.test(name)) {
+                    name = '';
+                }
                 if (!name) {
-                    name = 'anon' + Math.floor(1000 + Math.random() * 9000);
+                    name = 'anon' + String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
                     GameStorage.setItem(STORAGE_KEYS.anonName, name);
                 }
             } else {
