@@ -1200,6 +1200,186 @@
         let rankPeriod = 'daily';
         let playerName = '';
         let lastScoreId = null;
+        const STORAGE_KEYS = {
+            highScore: 'colorBridgeHighScore',
+            lastScore: 'colorBridgeLastScore',
+            rankings: 'colorBridgeRankings',
+            muted: 'colorBridgeMuted',
+            daily: 'colorBridgeDaily',
+            stats: 'colorBridgeStats',
+            ach: 'colorBridgeAch',
+            tutDone: 'colorBridgeTutDone',
+            heavyHint: 'colorBridgeHeavyHintDone',
+            mirrorHint: 'colorBridgeMirrorHintDone',
+            ghostHint: 'colorBridgeGhostHintDone',
+            speedHint: 'colorBridgeSpeedHintDone',
+            mysteryHint: 'colorBridgeMysteryHintDone',
+            changeHint: 'colorBridgeChangeHintDone',
+            zebraHint: 'colorBridgeZebraHintDone',
+            scriptDone: 'colorBridgeScriptDone',
+            playerName: 'colorBridgeName',
+            anonName: 'colorBridgeAnonName'
+        };
+        const PERSISTENT_KEYS = Object.values(STORAGE_KEYS);
+        const GameStorage = {
+            dataModule: null,
+            usingCrazyGamesData: false,
+            cache: Object.create(null),
+            initPromise: null,
+            getLocalItem(key) {
+                try { return localStorage.getItem(key); } catch (e) { return null; }
+            },
+            setLocalItem(key, value) {
+                try { localStorage.setItem(key, value); } catch (e) {}
+            },
+            removeLocalItem(key) {
+                try { localStorage.removeItem(key); } catch (e) {}
+            },
+            primeLocalCache() {
+                for (const key of PERSISTENT_KEYS) {
+                    const value = this.getLocalItem(key);
+                    if (value !== null) this.cache[key] = value;
+                }
+            },
+            async getRemoteItem(key) {
+                if (!this.dataModule) return null;
+                try {
+                    if (typeof this.dataModule.getItem === 'function') return await this.dataModule.getItem(key);
+                    if (typeof this.dataModule.get === 'function') return await this.dataModule.get(key);
+                } catch (e) {
+                    console.warn('[GameStorage] remote get failed:', key, e);
+                }
+                return null;
+            },
+            async setRemoteItem(key, value) {
+                if (!this.dataModule) return;
+                try {
+                    if (typeof this.dataModule.setItem === 'function') {
+                        await this.dataModule.setItem(key, value);
+                        return;
+                    }
+                    if (typeof this.dataModule.set === 'function') {
+                        await this.dataModule.set(key, value);
+                    }
+                } catch (e) {
+                    console.warn('[GameStorage] remote set failed:', key, e);
+                }
+            },
+            async removeRemoteItem(key) {
+                if (!this.dataModule) return;
+                try {
+                    if (typeof this.dataModule.removeItem === 'function') {
+                        await this.dataModule.removeItem(key);
+                        return;
+                    }
+                    if (typeof this.dataModule.remove === 'function') {
+                        await this.dataModule.remove(key);
+                    }
+                } catch (e) {
+                    console.warn('[GameStorage] remote remove failed:', key, e);
+                }
+            },
+            async clearRemote() {
+                if (!this.dataModule) return;
+                try {
+                    if (typeof this.dataModule.clear === 'function') {
+                        await this.dataModule.clear();
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('[GameStorage] remote clear failed:', e);
+                }
+            },
+            getItem(key) {
+                if (Object.prototype.hasOwnProperty.call(this.cache, key)) return this.cache[key];
+                const value = this.getLocalItem(key);
+                if (value !== null) this.cache[key] = value;
+                return value;
+            },
+            setItem(key, value) {
+                if (value === undefined || value === null) {
+                    this.removeItem(key);
+                    return;
+                }
+                const stored = String(value);
+                this.cache[key] = stored;
+                this.setLocalItem(key, stored);
+                this.setRemoteItem(key, stored);
+            },
+            removeItem(key) {
+                delete this.cache[key];
+                this.removeLocalItem(key);
+                this.removeRemoteItem(key);
+            },
+            clear() {
+                for (const key of PERSISTENT_KEYS) {
+                    delete this.cache[key];
+                    this.removeLocalItem(key);
+                }
+                this.clearRemote();
+            },
+            isUsingCrazyGamesData() {
+                return this.usingCrazyGamesData;
+            },
+            async syncPersistentKeys() {
+                for (const key of PERSISTENT_KEYS) {
+                    const localValue = this.getLocalItem(key);
+                    const remoteValue = await this.getRemoteItem(key);
+                    if (remoteValue !== null && remoteValue !== undefined) {
+                        const stored = String(remoteValue);
+                        this.cache[key] = stored;
+                        if (localValue !== stored) this.setLocalItem(key, stored);
+                    } else if (localValue !== null) {
+                        this.cache[key] = localValue;
+                        await this.setRemoteItem(key, localValue);
+                    }
+                }
+            },
+            init(dataModulePromise) {
+                if (this.initPromise) return this.initPromise;
+                this.primeLocalCache();
+                console.log('[GameStorage] fallback = localStorage');
+                this.initPromise = (async () => {
+                    try {
+                        const dataModule = await Promise.resolve(dataModulePromise).catch(() => null);
+                        if (!dataModule) {
+                            console.log('[GameStorage] CrazyGames Data unavailable, staying on localStorage');
+                            return false;
+                        }
+                        this.dataModule = dataModule;
+                        this.usingCrazyGamesData = true;
+                        console.log('[GameStorage] CrazyGames Data available');
+                        await this.syncPersistentKeys();
+                        if (typeof applyPersistentStateFromStorage === 'function') applyPersistentStateFromStorage();
+                        return true;
+                    } catch (e) {
+                        console.warn('[GameStorage] init failed, using localStorage:', e);
+                        this.dataModule = null;
+                        this.usingCrazyGamesData = false;
+                        return false;
+                    }
+                })();
+                return this.initPromise;
+            }
+        };
+        function getStoredFlag(key) {
+            return GameStorage.getItem(key) === '1';
+        }
+        function setStoredFlag(key, value = true) {
+            if (value) GameStorage.setItem(key, '1');
+            else GameStorage.removeItem(key);
+        }
+        function getStoredJSON(key, fallback) {
+            try {
+                const raw = GameStorage.getItem(key);
+                return raw ? JSON.parse(raw) : fallback;
+            } catch (e) {
+                return fallback;
+            }
+        }
+        function setStoredJSON(key, value) {
+            try { GameStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+        }
 
         // --- Onboarding tutorial (first-time only) ---
         const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -1212,25 +1392,25 @@
             tutFreeze = true;
             // mark this hint as seen so it won't repeat
             if (block.tutType === 'heavy') {
-                localStorage.setItem('colorBridgeHeavyHintDone', '1');
+                setStoredFlag(STORAGE_KEYS.heavyHint);
                 ui.tutFreezeMsg.textContent = 'HIT IT ' + (block.tutVal || 2) + ' TIMES!';
             } else if (block.tutType === 'mirror') {
-                localStorage.setItem('colorBridgeMirrorHintDone', '1');
+                setStoredFlag(STORAGE_KEYS.mirrorHint);
                 ui.tutFreezeMsg.textContent = 'MIRROR: MATCH THE NEXT COLOR!';
             } else if (block.tutType === 'ghost') {
-                localStorage.setItem('colorBridgeGhostHintDone', '1');
+                setStoredFlag(STORAGE_KEYS.ghostHint);
                 ui.tutFreezeMsg.textContent = 'GHOST: MATCH THE COLOR!';
             } else if (block.tutType === 'speed') {
-                localStorage.setItem('colorBridgeSpeedHintDone', '1');
+                setStoredFlag(STORAGE_KEYS.speedHint);
                 ui.tutFreezeMsg.textContent = 'FAST BLOCK! MATCH QUICKLY!';
             } else if (block.tutType === 'mystery') {
-                localStorage.setItem('colorBridgeMysteryHintDone', '1');
+                setStoredFlag(STORAGE_KEYS.mysteryHint);
                 ui.tutFreezeMsg.textContent = 'MYSTERY: COLOR REVEALS LATE!';
             } else if (block.tutType === 'change') {
-                localStorage.setItem('colorBridgeChangeHintDone', '1');
+                setStoredFlag(STORAGE_KEYS.changeHint);
                 ui.tutFreezeMsg.textContent = 'CHANGING! MATCH ON ARRIVAL!';
             } else {
-                localStorage.setItem('colorBridgeZebraHintDone', '1');
+                setStoredFlag(STORAGE_KEYS.zebraHint);
                 ui.tutFreezeMsg.textContent = 'MATCH EITHER COLOR!';
             }
             block.tutType = null;
@@ -1273,13 +1453,13 @@
         }
 
         function showBasicGuide() {
-            if (localStorage.getItem('colorBridgeTutDone') === '1') return;
+            if (getStoredFlag(STORAGE_KEYS.tutDone)) return;
             ui.tutText.innerHTML = ACTION_WORD + '<br><span>to match the color</span>';
             ui.tutGuide.classList.remove('hidden');
         }
         function hideBasicGuide() {
-            if (localStorage.getItem('colorBridgeTutDone') !== '1') {
-                localStorage.setItem('colorBridgeTutDone', '1');
+            if (!getStoredFlag(STORAGE_KEYS.tutDone)) {
+                setStoredFlag(STORAGE_KEYS.tutDone);
             }
             ui.tutGuide.classList.add('hidden');
         }
@@ -1302,13 +1482,13 @@
             if (tutBannerTimer) { clearTimeout(tutBannerTimer); tutBannerTimer = null; }
         }
         function maybeShowHeavyHint(durability) {
-            if (localStorage.getItem('colorBridgeHeavyHintDone') === '1') return;
-            localStorage.setItem('colorBridgeHeavyHintDone', '1');
+            if (getStoredFlag(STORAGE_KEYS.heavyHint)) return;
+            setStoredFlag(STORAGE_KEYS.heavyHint);
             showTutBanner('HIT IT ' + durability + ' TIMES!', 3000);
         }
         function maybeShowZebraHint() {
-            if (localStorage.getItem('colorBridgeZebraHintDone') === '1') return;
-            localStorage.setItem('colorBridgeZebraHintDone', '1');
+            if (getStoredFlag(STORAGE_KEYS.zebraHint)) return;
+            setStoredFlag(STORAGE_KEYS.zebraHint);
             showTutBanner('MATCH EITHER COLOR!', 3000);
         }
         
@@ -1434,15 +1614,29 @@
         const RECOVERY_NEEDED = 10;
         
         function loadData() {
-            highScore = parseInt(localStorage.getItem('colorBridgeHighScore')) || 0;
-            lastScore = parseInt(localStorage.getItem('colorBridgeLastScore')) || 0;
-            rankings = JSON.parse(localStorage.getItem('colorBridgeRankings')) || [];
+            highScore = parseInt(GameStorage.getItem(STORAGE_KEYS.highScore)) || 0;
+            lastScore = parseInt(GameStorage.getItem(STORAGE_KEYS.lastScore)) || 0;
+            rankings = getStoredJSON(STORAGE_KEYS.rankings, []) || [];
             COLORS = THEMES.neon;
         }
         function saveData() {
-            localStorage.setItem('colorBridgeHighScore', highScore);
-            localStorage.setItem('colorBridgeLastScore', lastScore);
-            localStorage.setItem('colorBridgeRankings', JSON.stringify(rankings));
+            GameStorage.setItem(STORAGE_KEYS.highScore, highScore);
+            GameStorage.setItem(STORAGE_KEYS.lastScore, lastScore);
+            setStoredJSON(STORAGE_KEYS.rankings, rankings);
+        }
+        function applyPersistentStateFromStorage() {
+            loadData();
+            loadDaily();
+            loadAchStats();
+            if (ui.playerNameInput) {
+                const saved = GameStorage.getItem(STORAGE_KEYS.playerName) || '';
+                if (saved) ui.playerNameInput.value = saved;
+            }
+            if (SoundManager && typeof SoundManager.applyStoredSettings === 'function') {
+                SoundManager.applyStoredSettings();
+            }
+            refreshDailyUI();
+            refreshAchButton();
         }
         
         function resize() {
@@ -1542,19 +1736,32 @@
         // Crazy Games SDK wrapper
         const CG = {
             sdk: null,
+            data: null,
+            initPromise: null,
             init() {
-                try {
-                    if (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK) {
-                        this.sdk = window.CrazyGames.SDK;
-                        this.sdk.init();
-                        console.log('CrazyGames SDK initialized');
-                    } else {
-                        console.warn('CrazyGames SDK not available');
+                if (this.initPromise) return this.initPromise;
+                this.initPromise = (async () => {
+                    try {
+                        this.sdk = (window.CrazyGames && window.CrazyGames.SDK) || null;
+                        if (!this.sdk) {
+                            console.warn('CrazyGames SDK not available');
+                            return null;
+                        }
+                        await Promise.resolve(this.sdk.init && this.sdk.init());
+                        this.data = this.sdk.data || this.sdk.dataModule || (this.sdk.modules && this.sdk.modules.data) || null;
+                        console.log('CrazyGames SDK initialized', { hasData: !!this.data });
+                        return this.data;
+                    } catch (e) {
+                        console.warn('CrazyGames SDK init failed:', e);
+                        this.sdk = null;
+                        this.data = null;
+                        return null;
                     }
-                } catch (e) {
-                    console.warn('CrazyGames SDK init failed:', e);
-                    this.sdk = null;
-                }
+                })();
+                return this.initPromise;
+            },
+            getDataModule() {
+                return this.data;
             },
             gameplayStart() {
                 try { if (this.sdk && this.sdk.game) this.sdk.game.gameplayStart(); } catch (e) {}
@@ -1585,16 +1792,25 @@
             bgmNextPassTime: 0,
             bgmPromise: null,
             muted: false,
+            forcedMuted: false,
             unlocked: false,
 
             init() {
-                this.muted = localStorage.getItem('colorBridgeMuted') === '1';
+                this.applyStoredSettings();
                 this.updateMuteButton();
 
                 const unlock = () => this.unlock();
                 window.addEventListener('pointerdown', unlock, { once: true, passive: true });
                 window.addEventListener('keydown', unlock, { once: true, passive: true });
                 window.addEventListener('touchstart', unlock, { once: true, passive: true });
+            },
+            applyStoredSettings() {
+                this.muted = GameStorage.getItem(STORAGE_KEYS.muted) === '1';
+                this.applyMuteState();
+                this.updateMuteButton();
+            },
+            applyMuteState() {
+                if (this.bgmGain) this.bgmGain.gain.value = (this.muted || this.forcedMuted) ? 0 : BGM_VOLUME;
             },
 
             ensureContext() {
@@ -1613,7 +1829,7 @@
                     this.master = this.context.createGain();
                     this.master.gain.value = 2.0;
                     this.bgmGain = this.context.createGain();
-                    this.bgmGain.gain.value = this.muted ? 0 : BGM_VOLUME;
+                    this.bgmGain.gain.value = (this.muted || this.forcedMuted) ? 0 : BGM_VOLUME;
 
                     // Brick-wall limiter on the final output to prevent clipping/distortion
                     // when several sounds overlap (especially on phone speakers).
@@ -1652,9 +1868,19 @@
 
             toggleMute() {
                 this.muted = !this.muted;
-                localStorage.setItem('colorBridgeMuted', this.muted ? '1' : '0');
-                if (this.bgmGain) this.bgmGain.gain.value = this.muted ? 0 : BGM_VOLUME;
+                GameStorage.setItem(STORAGE_KEYS.muted, this.muted ? '1' : '0');
+                this.applyMuteState();
                 this.updateMuteButton();
+            },
+            muteAllAudio() {
+                this.setAudioMuted(true);
+            },
+            unmuteAllAudio() {
+                this.setAudioMuted(false);
+            },
+            setAudioMuted(isMuted) {
+                this.forcedMuted = !!isMuted;
+                this.applyMuteState();
             },
 
             async loadBgm() {
@@ -1762,7 +1988,7 @@
                 const t = context.currentTime;
                 if (this.bgmGain) {
                     this.bgmGain.gain.cancelScheduledValues(t);
-                    this.bgmGain.gain.setValueAtTime(this.muted ? 0 : BGM_VOLUME, t);
+                    this.bgmGain.gain.setValueAtTime((this.muted || this.forcedMuted) ? 0 : BGM_VOLUME, t);
                 }
 
                 this.bgmNextPassTime = t + 0.05;
@@ -1797,7 +2023,7 @@
                 filterQ = 0.7,
                 detune = 0
             } = {}) {
-                if (this.muted || !this.unlocked) return;
+                if (this.muted || this.forcedMuted || !this.unlocked) return;
                 const context = this.ensureContext();
                 if (!context) return;
 
@@ -1843,7 +2069,7 @@
                 filterFrequency = 1000,
                 filterQ = 0.6
             } = {}) {
-                if (this.muted || !this.unlocked) return;
+                if (this.muted || this.forcedMuted || !this.unlocked) return;
                 const context = this.ensureContext();
                 if (!context) return;
 
@@ -2160,7 +2386,10 @@
         };
         
         window.addEventListener('load', () => {
-            CG.init();
+            CG.sdkGameLoadingStart();
+            const sdkInit = CG.init();
+            sdkInit.finally(() => CG.sdkGameLoadingStop());
+            GameStorage.init(sdkInit.then(() => CG.getDataModule()));
             SoundManager.init();
         });
         
@@ -2219,7 +2448,7 @@
 
         let dailyState = null; // { dateKey, progress, done }
         function loadDaily() {
-            try { dailyState = JSON.parse(localStorage.getItem('colorBridgeDaily')); } catch (e) { dailyState = null; }
+            try { dailyState = getStoredJSON(STORAGE_KEYS.daily, null); } catch (e) { dailyState = null; }
             rolloverDaily();
         }
         function rolloverDaily() {
@@ -2230,7 +2459,7 @@
             }
         }
         function saveDaily() {
-            try { localStorage.setItem('colorBridgeDaily', JSON.stringify(dailyState)); } catch (e) {}
+            try { setStoredJSON(STORAGE_KEYS.daily, dailyState); } catch (e) {}
         }
         function finalizeDaily(ch) {
             if (!dailyState.done && dailyState.progress >= ch.target) {
@@ -2298,18 +2527,18 @@
 
         function loadAchStats() {
             try {
-                const s = JSON.parse(localStorage.getItem('colorBridgeStats'));
+                const s = getStoredJSON(STORAGE_KEYS.stats, null);
                 if (s) achStats = Object.assign(achStats, s);
             } catch (e) {}
             try {
-                achUnlocked = JSON.parse(localStorage.getItem('colorBridgeAch')) || [];
+                achUnlocked = getStoredJSON(STORAGE_KEYS.ach, []) || [];
             } catch (e) { achUnlocked = []; }
         }
         function saveAchStats() {
-            try { localStorage.setItem('colorBridgeStats', JSON.stringify(achStats)); } catch (e) {}
+            try { setStoredJSON(STORAGE_KEYS.stats, achStats); } catch (e) {}
         }
         function saveAchUnlocked() {
-            try { localStorage.setItem('colorBridgeAch', JSON.stringify(achUnlocked)); } catch (e) {}
+            try { setStoredJSON(STORAGE_KEYS.ach, achUnlocked); } catch (e) {}
         }
 
         // Tier colors: bronze / silver / gold / legendary(purple)
@@ -2589,7 +2818,7 @@
             saveChanceBlock = null;
             firstSuccessShown = false;
             totalMistakes = 0;
-            scriptedRemaining = (selectedMode === 'classic' && localStorage.getItem('colorBridgeScriptDone') !== '1') ? 3 : 0;
+            scriptedRemaining = (selectedMode === 'classic' && !getStoredFlag(STORAGE_KEYS.scriptDone)) ? 3 : 0;
             updateRecoveryUI();
             
             ui.score.textContent = '0';
@@ -2617,7 +2846,7 @@
         function pauseGame() {
             if (state !== 'playing') return;
             isPaused = true;
-            CG.sdkGameLoadingStart();
+            CG.gameplayStop();
             const context = SoundManager.ensureContext();
             if (context) context.suspend().catch(() => {});
             showScreen('pause');
@@ -2625,7 +2854,7 @@
         function resumeGame() {
             isPaused = false;
             showScreen(null);
-            CG.sdkGameLoadingStop();
+            CG.gameplayStart();
             const context = SoundManager.ensureContext();
             if (context) context.resume().catch(() => {});
             lastTime = performance.now();
@@ -2754,13 +2983,13 @@
             let name = ((ui.playerNameInput && ui.playerNameInput.value) || '').trim().slice(0, 20);
             if (name.length === 0) {
                 // reuse a stable anon name for this device, or make a new one
-                name = localStorage.getItem('colorBridgeAnonName') || '';
+                name = GameStorage.getItem(STORAGE_KEYS.anonName) || '';
                 if (!name) {
                     name = 'anon' + Math.floor(1000 + Math.random() * 9000);
-                    localStorage.setItem('colorBridgeAnonName', name);
+                    GameStorage.setItem(STORAGE_KEYS.anonName, name);
                 }
             } else {
-                localStorage.setItem('colorBridgeName', name);
+                GameStorage.setItem(STORAGE_KEYS.playerName, name);
             }
             return name;
         }
@@ -2828,7 +3057,7 @@
         async function fetchAndRenderRanking() {
             if (!sbClient) {
                 ui.rankingList.innerHTML = '';
-                ui.rankSummary.textContent = '—';
+                ui.rankSummary.textContent = 'Leaderboard unavailable';
                 ui.rankSummary.classList.remove('out');
                 return;
             }
@@ -2850,7 +3079,7 @@
             } catch (e) {
                 console.warn('fetch ranking failed:', e);
                 ui.rankingList.innerHTML = '';
-                ui.rankSummary.textContent = '—';
+                ui.rankSummary.textContent = 'Leaderboard unavailable';
             }
         }
 
@@ -3011,7 +3240,7 @@
                 });
                 scriptedRemaining--;
                 if (scriptedRemaining === 0) {
-                    localStorage.setItem('colorBridgeScriptDone', '1');
+                    setStoredFlag(STORAGE_KEYS.scriptDone);
                 }
                 return;
             }
@@ -3048,7 +3277,7 @@
                     durability,
                     maxDurability: durability
                 };
-                if (localStorage.getItem('colorBridgeHeavyHintDone') !== '1') {
+                if (!getStoredFlag(STORAGE_KEYS.heavyHint)) {
                     heavyBlock.tutType = 'heavy';
                     heavyBlock.tutVal = durability;
                 }
@@ -3088,28 +3317,28 @@
                 wobbleOffset: Math.random() * Math.PI * 2,
                 invuln: 0
             };
-            if (data.type === 'zebra' && localStorage.getItem('colorBridgeZebraHintDone') !== '1') {
+            if (data.type === 'zebra' && !getStoredFlag(STORAGE_KEYS.zebraHint)) {
                 newBlock.tutType = 'zebra';
             }
-            if (data.type === 'mirror' && localStorage.getItem('colorBridgeMirrorHintDone') !== '1') {
+            if (data.type === 'mirror' && !getStoredFlag(STORAGE_KEYS.mirrorHint)) {
                 newBlock.tutType = 'mirror';
             }
-            if (data.type === 'ghost' && localStorage.getItem('colorBridgeGhostHintDone') !== '1') {
+            if (data.type === 'ghost' && !getStoredFlag(STORAGE_KEYS.ghostHint)) {
                 newBlock.tutType = 'ghost';
             }
-            if (data.type === 'speed' && localStorage.getItem('colorBridgeSpeedHintDone') !== '1') {
+            if (data.type === 'speed' && !getStoredFlag(STORAGE_KEYS.speedHint)) {
                 newBlock.tutType = 'speed';
             }
             if (data.type === 'mystery') {
                 newBlock.revealed = false;
-                if (localStorage.getItem('colorBridgeMysteryHintDone') !== '1') {
+                if (!getStoredFlag(STORAGE_KEYS.mysteryHint)) {
                     newBlock.tutType = 'mystery';
                 }
             }
             if (data.type === 'change') {
                 newBlock.changeIndex = Math.floor(Math.random() * COLORS.length);
                 newBlock.changeTimer = 0;
-                if (localStorage.getItem('colorBridgeChangeHintDone') !== '1') {
+                if (!getStoredFlag(STORAGE_KEYS.changeHint)) {
                     newBlock.tutType = 'change';
                 }
             }
@@ -3163,7 +3392,7 @@
         });
         // restore last used name into the start-screen input
         (function () {
-            const saved = localStorage.getItem('colorBridgeName') || '';
+            const saved = GameStorage.getItem(STORAGE_KEYS.playerName) || '';
             if (saved && ui.playerNameInput) ui.playerNameInput.value = saved;
         })();
 
