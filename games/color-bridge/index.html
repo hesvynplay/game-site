@@ -1635,8 +1635,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         let bridgePulse = 0;
         let feverActive = false;
         let feverTimer = 0;
-        let rainbowBridgeActive = false;
-        let rainbowBridgeTimer = 0;
         let heavyBlockActive = false;
         let heavyBlockCooldown = 0;
         let recoveryGauge = 0;
@@ -2967,8 +2965,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             bridgePulse = 0;
             feverActive = false;
             feverTimer = 0;
-            rainbowBridgeActive = false;
-            rainbowBridgeTimer = 0;
             heavyBlockActive = false;
             heavyBlockCooldown = 0;
             recoveryGauge = 0;
@@ -3750,15 +3746,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 }
             }
             
-            // Rainbow Bridge: every 15 combo, 5 seconds of any-color success
-            if (rainbowBridgeActive) {
-                rainbowBridgeTimer -= dt;
-                if (rainbowBridgeTimer <= 0) {
-                    rainbowBridgeActive = false;
-                    ui.rainbowBadge.style.opacity = '0';
-                }
-            }
-            
             // Safe start timer
             if (safeTime > 0) {
                 safeTime -= dt;
@@ -3842,7 +3829,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             // zone, otherwise at high level/speed it stays invulnerable while
                             // crossing and passes through after a single hit. Keep it short.
                             b.invuln = 10;
-                            const hitColor = rainbowBridgeActive ? '#ffffff' : COLORS[currentColorIndex].hex;
+                            const hitColor = COLORS[currentColorIndex].hex;
                             createSuccessEffect(b.x + b.width / 2, bridgeY, hitColor);
                             if (b.durability > 0) {
                                 score += Math.floor(25 * mode.scoreMult);
@@ -3935,14 +3922,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             if (runFever > runMaxFever) runMaxFever = runFever;
                         }
 
-                        if (false && combo > 0 && combo % 15 === 0 && !rainbowBridgeActive) {
-                            rainbowBridgeActive = true;
-                            runRainbow++;
-                            rainbowBridgeTimer = 300;
-                            ui.rainbowBadge.style.opacity = '1';
-                            addFloatingText('RAINBOW!', w / 2, bridgeY - 80, '#ffffff');
-                        }
-
                         const basePoints = b.type === 'rainbow' ? 30 : 10;
                         const comboBonus = Math.floor(combo / 5) * 5;
                         const feverMult = feverActive ? 2 : 1;
@@ -4003,7 +3982,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                         ui.combo.textContent = 'x' + combo;
                         ui.combo.style.opacity = combo >= 2 ? '1' : '0';
 
-                        const color = isRainbow || rainbowBridgeActive ? '#ffffff' : COLORS[currentColorIndex].hex;
+                        const color = isRainbow ? '#ffffff' : COLORS[currentColorIndex].hex;
                         createSuccessEffect(b.x + b.width / 2, bridgeY, color);
                         
                         // Enhanced feedback texts
@@ -4726,9 +4705,9 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         
         function drawBridge(w, bridgeY) {
             const bridgeHeight = 26;
-            const color = rainbowBridgeActive ? { hex: '#ffffff' } : COLORS[currentColorIndex];
+            const color = COLORS[currentColorIndex];
             const pulseSize = bridgePulse * 12;
-            const specialScale = (feverActive || rainbowBridgeActive) ? 1.06 : 1;
+            const specialScale = feverActive ? 1.06 : 1;
             
             ctx.save();
             ctx.translate(w/2, bridgeY + bridgeHeight/2);
