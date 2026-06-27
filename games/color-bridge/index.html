@@ -55,6 +55,27 @@
                 width: min(100vw, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
                 aspect-ratio: 9 / 16;
             }
+            #ui {
+                justify-content: flex-start;
+                align-items: center;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
+                padding-top: max(12px, env(safe-area-inset-top));
+                padding-bottom: max(12px, env(safe-area-inset-bottom));
+            }
+            .screen {
+                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #gameOverScreen,
+            #achScreen {
+                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
+            }
         }
         canvas {
             width: 100%;
@@ -821,9 +842,18 @@
             #achScreen {
                 padding-top: calc(env(safe-area-inset-top) + 10px);
                 padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
+            }
+            #gameOverScreen {
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
             }
             #achGrid {
                 padding-right: 2px;
+                touch-action: pan-y;
             }
             .ach-cat-grid {
                 gap: 6px;
@@ -836,6 +866,9 @@
             }
             .ach-hint {
                 font-size: 0.54em;
+            }
+            #rankingList {
+                touch-action: pan-y;
             }
         }
         .ach-cat-head {
@@ -2890,7 +2923,7 @@
                 const colorIdx = (scriptIndex < 2)
                     ? currentColorIndex
                     : (currentColorIndex + 1) % COLORS.length;
-                const size = 40;
+                const size = 42;
                 blocks.push({
                     x: leftX + laneWidth / 2 - size / 2,
                     y: -90,
@@ -2917,7 +2950,7 @@
                 const durability = getHeavyBlockDurability();
                 const candidateBlock = {
                     y: -136,
-                    height: 56,
+                    height: 60,
                     speed: speed * 0.82
                 };
                 if (blocks.some(b => !b.passed && overlapsBridgeWindow(candidateBlock, b))) {
@@ -2930,8 +2963,8 @@
                 const heavyBlock = {
                     x: leftX + laneWidth / 2 - 52,
                     y: -136,
-                    width: 56,
-                    height: 56,
+                    width: 60,
+                    height: 60,
                     speed: speed * 0.82,
                     colorIndices: [Math.floor(Math.random() * COLORS.length)],
                     type: 'heavy',
@@ -2962,7 +2995,7 @@
             const data = previewBlocks.shift();
             const candidateBlock = {
                 y: -90,
-                height: data.type === 'zebra' ? 40 : (data.type === 'rainbow' ? 32 : (data.type === 'ghost' ? 40 : 36)),
+                height: data.type === 'zebra' ? 42 : (data.type === 'rainbow' ? 34 : (data.type === 'ghost' ? 42 : 38)),
                 speed: speed * (0.9 + Math.random() * 0.2) * (data.type === 'speed' ? 1.8 : 1)
             };
             if (blocks.some(b => !b.passed && overlapsBridgeWindow(candidateBlock, b))) {
@@ -2971,7 +3004,7 @@
             }
             
             const newBlock = {
-                x: leftX + Math.random() * (laneWidth - 40),
+                x: leftX + Math.random() * (laneWidth - 42),
                 y: -90,
                 width: candidateBlock.height,
                 height: candidateBlock.height,
