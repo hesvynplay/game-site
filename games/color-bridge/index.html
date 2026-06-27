@@ -494,7 +494,7 @@
             color: #fff;
             font-family: 'Montserrat', sans-serif;
             font-weight: 700;
-            font-size: 0.9em;
+            font-size: 16px;
             outline: none;
             margin-bottom: 4px;
         }
@@ -789,6 +789,7 @@
             z-index: 60;
             display: flex;
             flex-direction: column;
+            min-height: 0;
             padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
             box-sizing: border-box;
         }
@@ -809,7 +810,7 @@
         #achProgPct { color: #00e676; font-weight: 900; font-size: 1.3em; }
         .ach-prog-bar { width: 100%; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); overflow: hidden; }
         #achProgFill { height: 100%; width: 0%; border-radius: 5px; background: linear-gradient(90deg, #4da6ff, #00e676); transition: width 0.5s ease; }
-        #achGrid { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        #achGrid { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
         .ach-cat-head {
             color: rgba(255,255,255,0.55); font-weight: 900; font-size: 0.7em;
             letter-spacing: 1.5px; margin: 14px 2px 8px;
