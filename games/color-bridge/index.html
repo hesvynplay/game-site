@@ -1050,7 +1050,7 @@
 
                 <button class="btn btn-primary" id="startBtn">PLAY</button>
                 <button class="btn btn-secondary" id="achBtn" style="margin-top:10px"><span id="achBtnLabel">ACHIEVEMENTS  0%</span></button>
-                <div style="font-size:0.58em; color:rgba(255,255,255,0.3); margin-top:12px; text-align:center; line-height:1.4;">Your name and score are saved online for rankings.</div>
+                <div style="font-size:0.58em; color:rgba(255,255,255,0.3); margin-top:12px; text-align:center; line-height:1.4;">Use a nickname. Do not enter your real name or personal information. Your name and score may appear in online rankings.</div>
                 <div style="font-size:0.6em; color:rgba(255,255,255,0.35); margin-top:6px; text-align:center;">Music: Geometric Memory — HTb-music (Pixabay)</div>
             </div>
             
@@ -1189,6 +1189,7 @@
         const SUPABASE_URL = 'https://fqctemblbhlxfjumyzus.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_WYpwUhmWdpx7fsxeptK3JA_oNcAT66f';
         let sbClient = null;
+        const RANKING_EDGE_URL = 'https://fqctemblbhlxfjumyzus.supabase.co/functions/v1/submit-score';
         try {
             if (window.supabase && SUPABASE_URL && SUPABASE_KEY) {
                 sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -1200,6 +1201,8 @@
         let rankPeriod = 'daily';
         let playerName = '';
         let lastScoreId = null;
+        let runStartAt = 0;
+        let runSessionId = '';
         const STORAGE_KEYS = {
             highScore: 'colorBridgeHighScore',
             lastScore: 'colorBridgeLastScore',
@@ -1763,17 +1766,37 @@
             getDataModule() {
                 return this.data;
             },
+            loadingStart() {
+                try { if (this.sdk && this.sdk.game && typeof this.sdk.game.loadingStart === 'function') this.sdk.game.loadingStart(); } catch (e) {}
+            },
+            loadingStop() {
+                try { if (this.sdk && this.sdk.game && typeof this.sdk.game.loadingStop === 'function') this.sdk.game.loadingStop(); } catch (e) {}
+            },
+            syncMuteAudio() {
+                try {
+                    const muteAudio = !!(this.sdk && this.sdk.game && this.sdk.game.settings && this.sdk.game.settings.muteAudio);
+                    SoundManager.applyCrazyGamesMuteSetting(muteAudio);
+                    return muteAudio;
+                } catch (e) {
+                    console.warn('CrazyGames muteAudio read failed:', e);
+                    return false;
+                }
+            },
+            registerSettingsChangeListener() {
+                try {
+                    const handler = () => this.syncMuteAudio();
+                    if (this.sdk && this.sdk.game && typeof this.sdk.game.addSettingsChangeListener === 'function') {
+                        this.sdk.game.addSettingsChangeListener(handler);
+                    }
+                } catch (e) {
+                    console.warn('CrazyGames settings listener failed:', e);
+                }
+            },
             gameplayStart() {
                 try { if (this.sdk && this.sdk.game) this.sdk.game.gameplayStart(); } catch (e) {}
             },
             gameplayStop() {
                 try { if (this.sdk && this.sdk.game) this.sdk.game.gameplayStop(); } catch (e) {}
-            },
-            sdkGameLoadingStart() {
-                try { if (this.sdk && this.sdk.game) this.sdk.game.sdkGameLoadingStart(); } catch (e) {}
-            },
-            sdkGameLoadingStop() {
-                try { if (this.sdk && this.sdk.game) this.sdk.game.sdkGameLoadingStop(); } catch (e) {}
             },
             happytime() {
                 try { if (this.sdk && this.sdk.game) this.sdk.game.happytime(); } catch (e) {}
@@ -1806,6 +1829,11 @@
             },
             applyStoredSettings() {
                 this.muted = GameStorage.getItem(STORAGE_KEYS.muted) === '1';
+                this.applyMuteState();
+                this.updateMuteButton();
+            },
+            applyCrazyGamesMuteSetting(muteAudio) {
+                this.forcedMuted = !!muteAudio;
                 this.applyMuteState();
                 this.updateMuteButton();
             },
@@ -1881,6 +1909,7 @@
             setAudioMuted(isMuted) {
                 this.forcedMuted = !!isMuted;
                 this.applyMuteState();
+                this.updateMuteButton();
             },
 
             async loadBgm() {
@@ -2386,9 +2415,13 @@
         };
         
         window.addEventListener('load', () => {
-            CG.sdkGameLoadingStart();
             const sdkInit = CG.init();
-            sdkInit.finally(() => CG.sdkGameLoadingStop());
+            sdkInit.then(() => {
+                CG.loadingStart();
+                CG.syncMuteAudio();
+                CG.registerSettingsChangeListener();
+                requestAnimationFrame(() => CG.loadingStop());
+            }).catch(() => {});
             GameStorage.init(sdkInit.then(() => CG.getDataModule()));
             SoundManager.init();
         });
@@ -2694,6 +2727,64 @@
             ui.achBtnLabel.textContent = 'ACHIEVEMENTS  ' + p.pct + '%';
         }
 
+        function sanitizeScoreName(input) {
+            const safe = String(input || '').trim().slice(0, 20).replace(/[^a-zA-Z0-9 _.-]/g, '');
+            return safe || 'anon';
+        }
+
+        function createRunSessionId() {
+            return 's_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
+
+        let lastSubmitAt = 0;
+        async function submitScore(scoreValue, modeValue, sessionId, playTime, blocksValue, comboValue) {
+            const mode = String(modeValue || '').toLowerCase();
+            if (mode !== 'classic' && mode !== 'hard') return null;
+            const now = Date.now();
+            if (now - lastSubmitAt < 1500) throw new Error('rate_limited');
+            lastSubmitAt = now;
+            const safeName = sanitizeScoreName(playerName || resolvePlayerName());
+            const payload = {
+                score: Math.max(0, Math.min(50000, Math.floor(Number(scoreValue) || 0))),
+                mode,
+                sessionId: String(sessionId || ''),
+                playTime: Math.max(0, Math.min(3600, Math.floor(Number(playTime) || 0))),
+                blocksCleared: Math.max(0, Math.min(5000, Math.floor(Number(blocksValue) || 0))),
+                maxCombo: Math.max(0, Math.min(9999, Math.floor(Number(comboValue) || 0))),
+                name: safeName
+            };
+            if (!payload.sessionId) throw new Error('invalid_session');
+            if (!payload.name || payload.name.length > 20) throw new Error('invalid_name');
+            if (!/^[a-zA-Z0-9 _.-]+$/.test(payload.name)) throw new Error('invalid_name_chars');
+            if (payload.playTime > 0) {
+                const maxReasonable = Math.max(200, payload.playTime * 120 + 1500);
+                if (payload.score > maxReasonable) throw new Error('score_too_high');
+            }
+            if (payload.blocksCleared > payload.playTime * 10 + 200) throw new Error('blocks_too_high');
+            if (payload.maxCombo > payload.blocksCleared + 25) throw new Error('combo_too_high');
+
+            try {
+                const response = await fetch(RANKING_EDGE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': 'Bearer ' + SUPABASE_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || (result && result.error)) {
+                    console.warn('Edge score submit failed:', result && result.error ? result.error : ('edge_' + response.status));
+                    return null;
+                }
+                return result;
+            } catch (e) {
+                console.warn('Edge score submit failed:', e);
+                return null;
+            }
+        }
+
         function renderAchievements() {
             if (!ui.achGrid) return;
             const p = achProgress();
@@ -2748,6 +2839,8 @@
         function startGame() {
             state = 'playing';
             playerName = resolvePlayerName();
+            runSessionId = createRunSessionId();
+            runStartAt = performance.now();
             COLORS = (selectedMode === 'hard') ? HARD_COLORS : THEMES[currentTheme];
             isPaused = false;
             score = 0;
@@ -2980,7 +3073,7 @@
         }
 
         function resolvePlayerName() {
-            let name = ((ui.playerNameInput && ui.playerNameInput.value) || '').trim().slice(0, 20);
+            let name = sanitizeScoreName((ui.playerNameInput && ui.playerNameInput.value) || '');
             if (name.length === 0) {
                 // reuse a stable anon name for this device, or make a new one
                 name = GameStorage.getItem(STORAGE_KEYS.anonName) || '';
@@ -3095,14 +3188,11 @@
             updateRankTabsUI();
 
             const rankable = (selectedMode === 'classic' || selectedMode === 'hard');
-            if (sbClient && rankable) {
+            if (rankable) {
                 try {
-                    const { data, error } = await sbClient
-                        .from('scores')
-                        .insert({ name: playerName, score, mode: selectedMode })
-                        .select('id')
-                        .single();
-                    if (!error && data) lastScoreId = data.id;
+                    const playTime = Math.max(1, Math.floor((performance.now() - (runStartAt || performance.now())) / 1000));
+                    const result = await submitScore(score, selectedMode, runSessionId, playTime, blocksCleared, maxCombo);
+                    if (result && result.id) lastScoreId = result.id;
                 } catch (e) {
                     console.warn('submit score failed:', e);
                 }
