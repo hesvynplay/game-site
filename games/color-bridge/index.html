@@ -1076,6 +1076,21 @@
             if (block.tutType === 'heavy') {
                 localStorage.setItem('colorBridgeHeavyHintDone', '1');
                 ui.tutFreezeMsg.textContent = 'HIT IT ' + (block.tutVal || 2) + ' TIMES!';
+            } else if (block.tutType === 'mirror') {
+                localStorage.setItem('colorBridgeMirrorHintDone', '1');
+                ui.tutFreezeMsg.textContent = 'MIRROR: MATCH THE NEXT COLOR!';
+            } else if (block.tutType === 'ghost') {
+                localStorage.setItem('colorBridgeGhostHintDone', '1');
+                ui.tutFreezeMsg.textContent = 'GHOST: MATCH THE COLOR!';
+            } else if (block.tutType === 'speed') {
+                localStorage.setItem('colorBridgeSpeedHintDone', '1');
+                ui.tutFreezeMsg.textContent = 'FAST BLOCK! MATCH QUICKLY!';
+            } else if (block.tutType === 'mystery') {
+                localStorage.setItem('colorBridgeMysteryHintDone', '1');
+                ui.tutFreezeMsg.textContent = 'MYSTERY: COLOR REVEALS LATE!';
+            } else if (block.tutType === 'change') {
+                localStorage.setItem('colorBridgeChangeHintDone', '1');
+                ui.tutFreezeMsg.textContent = 'CHANGING! MATCH ON ARRIVAL!';
             } else {
                 localStorage.setItem('colorBridgeZebraHintDone', '1');
                 ui.tutFreezeMsg.textContent = 'MATCH EITHER COLOR!';
@@ -1103,8 +1118,12 @@
             ctx.shadowBlur = 24;
             ctx.stroke();
             ctx.restore();
-            // redraw the highlighted block on top of the dim layer
+            // redraw the highlighted block on top of the dim layer.
+            // Ghost is normally faint at mid-screen, so force it visible for the hint.
+            const savedOpacity = block.opacity;
+            if (block.type === 'ghost') block.opacity = 0.96;
             drawBlock(block, getLevelConfig(level));
+            block.opacity = savedOpacity;
         }
 
         function resumeTutFreeze() {
@@ -1156,21 +1175,35 @@
         }
         
         function getLevelConfig(level) {
-            const manual = [
-                { colors: 3, speedAdd: 0, effects: [] },
-                { colors: 3, speedAdd: 0.5, effects: ['pulse'] },
-                { colors: 3, speedAdd: 0.9, effects: ['pulse', 'zebra'] },
-                { colors: 3, speedAdd: 1.4, effects: ['pulse', 'zebra', 'wobble'] },
-                { colors: 4, speedAdd: 1.9, effects: ['pulse', 'zebra', 'wobble', 'ghost'] },
-                { colors: 4, speedAdd: 2.4, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] },
-                { colors: 4, speedAdd: 2.9, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] }
+            const colors = level <= 4 ? 3 : 4;
+            const points = [
+                { level: 1, speedAdd: 0 },
+                { level: 5, speedAdd: 0.7 },
+                { level: 10, speedAdd: 1.4 },
+                { level: 20, speedAdd: 2.7 },
+                { level: 30, speedAdd: 3.9 },
+                { level: 40, speedAdd: 5.0 },
+                { level: 50, speedAdd: 6.0 },
+                { level: 70, speedAdd: 7.8 },
+                { level: 100, speedAdd: 10.0 }
             ];
-            if (level <= manual.length) return manual[level - 1];
-            
-            const extra = level - manual.length;
-            const colors = 4;
-            const speedAdd = 2.9 + extra * 0.25;
-            const effects = ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'];
+            let speedAdd = 10.0;
+            for (let i = 0; i < points.length - 1; i++) {
+                const a = points[i];
+                const b = points[i + 1];
+                if (level >= a.level && level <= b.level) {
+                    const t = (level - a.level) / (b.level - a.level);
+                    speedAdd = a.speedAdd + (b.speedAdd - a.speedAdd) * t;
+                    break;
+                }
+            }
+            const effects = [];
+            if (level >= 2) effects.push('pulse');
+            if (level >= 4) effects.push('wobble', 'zebra', 'speed');
+            if (level >= 10) effects.push('ghost');
+            if (level >= 20) effects.push('change');
+            if (level >= 30) effects.push('mirror');
+            if (level >= 40) effects.push('mystery');
             if (level >= 15) effects.push('split');
             if (level >= 30) effects.push('fastspin');
             if (level >= 50) effects.push('shrink');
@@ -1205,6 +1238,26 @@
         let runZebra = 0;
         let runFever = 0;
         let runRainbow = 0;
+        let runSpeed = 0;
+        let runMirror = 0;
+        let runMystery = 0;
+        let runChange = 0;
+        let runMaxFever = 0;
+        let noMissStreak = 0;
+        let runChangeStreak = 0;
+        let runGhostInStreak = 0;
+        let runMysteryInStreak = 0;
+        let runFeverChange = 0;
+        let runTypesCleared = {};
+        let runMirrorCount = 0, runMysteryCount = 0, runChangeCount = 0, runGhostCount = 0, runSpeedCount = 0;
+        let lv30Reached = false;
+        let noMissAfterLv30 = 0;
+        let missedThisRun = false;
+        let safeEnded = false;
+        let noMissAfterSafe = 0;
+        let noMissStreakMax = 0, noMissAfterLv30Max = 0, noMissAfterSafeMax = 0;
+        let runChangeStreakMax = 0, runGhostInStreakMax = 0, runMysteryInStreakMax = 0, runFeverChangeMax = 0;
+        let reachedLv30NoMiss = false;
         let currentColorIndex = 0;
         let lives = 3;
         let maxLives = 3;
@@ -1239,6 +1292,7 @@
         let firstSuccessShown = false;
         let totalMistakes = 0;
         let scriptedRemaining = 0;
+        let heavyBlockNextSpawnHold = 0;
         const RECOVERY_NEEDED = 10;
         
         function loadData() {
@@ -2100,7 +2154,9 @@
             heavyDestroyed: 0, zebraMatched: 0,
             feverCount: 0, rainbowCount: 0,
             bestClassic: 0, bestHard: 0,
-            maxCombo: 0, maxLevel: 0, dailyDone: 0
+            maxCombo: 0, maxLevel: 0, dailyDone: 0,
+            speedCleared: 0, ghostCleared: 0, changeCleared: 0,
+            mirrorCleared: 0, mysteryCleared: 0
         };
         let achUnlocked = []; // array of unlocked achievement ids
 
@@ -2129,45 +2185,57 @@
             return achStats[key] || 0;
         }
 
-        // 30 achievements (staged). cat groups for display.
         const ACHIEVEMENTS = [
-            // Score
-            { id: 'sc100',  cat: 'Score',  stat: 'bestScore', target: 100,  icon: '🎯', name: 'Getting Started', tier: 'bronze' },
-            { id: 'sc300',  cat: 'Score',  stat: 'bestScore', target: 300,  icon: '🎯', name: 'Warmed Up',       tier: 'bronze' },
-            { id: 'sc500',  cat: 'Score',  stat: 'bestScore', target: 500,  icon: '🎯', name: 'Sharp Shooter',   tier: 'silver' },
-            { id: 'sc1000', cat: 'Score',  stat: 'bestScore', target: 1000, icon: '🏆', name: 'Four Digits',     tier: 'silver' },
-            { id: 'sc2000', cat: 'Score',  stat: 'bestScore', target: 2000, icon: '🏆', name: 'Score Machine',   tier: 'gold' },
-            { id: 'sc3500', cat: 'Score',  stat: 'bestScore', target: 3500, icon: '👑', name: 'Bridge Legend',   tier: 'legend' },
-            // Combo
-            { id: 'cb5',   cat: 'Combo',  stat: 'maxCombo', target: 5,   icon: '🔥', name: 'On a Roll',     tier: 'bronze' },
-            { id: 'cb10',  cat: 'Combo',  stat: 'maxCombo', target: 10,  icon: '🔥', name: 'Combo Starter', tier: 'bronze' },
-            { id: 'cb25',  cat: 'Combo',  stat: 'maxCombo', target: 25,  icon: '🔥', name: 'Chain Master',  tier: 'silver' },
-            { id: 'cb50',  cat: 'Combo',  stat: 'maxCombo', target: 50,  icon: '⚡', name: 'Unstoppable',   tier: 'gold' },
-            { id: 'cb75',  cat: 'Combo',  stat: 'maxCombo', target: 75,  icon: '⚡', name: 'Combo Beast',   tier: 'gold' },
-            { id: 'cb100', cat: 'Combo',  stat: 'maxCombo', target: 100, icon: '💫', name: 'Century Chain', tier: 'legend' },
-            // Plays
-            { id: 'pl1',  cat: 'Plays', stat: 'plays', target: 1,  icon: '🎮', name: 'First Steps',  tier: 'bronze' },
-            { id: 'pl5',  cat: 'Plays', stat: 'plays', target: 5,  icon: '🎮', name: 'Getting Hooked', tier: 'bronze' },
-            { id: 'pl10', cat: 'Plays', stat: 'plays', target: 10, icon: '🎮', name: 'Regular',       tier: 'silver' },
-            { id: 'pl25', cat: 'Plays', stat: 'plays', target: 25, icon: '🎲', name: 'Dedicated',     tier: 'silver' },
-            { id: 'pl50', cat: 'Plays', stat: 'plays', target: 50, icon: '🎲', name: 'Addicted',      tier: 'gold' },
-            // Heavy
-            { id: 'hv1',  cat: 'Heavy', stat: 'heavyDestroyed', target: 1,  icon: '🧱', name: 'First Crush',   tier: 'bronze' },
-            { id: 'hv10', cat: 'Heavy', stat: 'heavyDestroyed', target: 10, icon: '🧱', name: 'Wall Breaker',  tier: 'silver' },
-            { id: 'hv30', cat: 'Heavy', stat: 'heavyDestroyed', target: 30, icon: '🔨', name: 'Demolisher',    tier: 'gold' },
-            { id: 'hv75', cat: 'Heavy', stat: 'heavyDestroyed', target: 75, icon: '🔨', name: 'Wrecking Ball', tier: 'legend' },
-            // Zebra
-            { id: 'zb1',  cat: 'Zebra', stat: 'zebraMatched', target: 1,  icon: '🦓', name: 'Two-Tone',     tier: 'bronze' },
-            { id: 'zb25', cat: 'Zebra', stat: 'zebraMatched', target: 25, icon: '🦓', name: 'Color Splitter', tier: 'silver' },
-            { id: 'zb75', cat: 'Zebra', stat: 'zebraMatched', target: 75, icon: '🎨', name: 'Zebra Master',  tier: 'gold' },
-            // Level
-            { id: 'lv3', cat: 'Level', stat: 'maxLevel', target: 3, icon: '📈', name: 'Climbing',    tier: 'bronze' },
-            { id: 'lv5', cat: 'Level', stat: 'maxLevel', target: 5, icon: '📈', name: 'High Riser',  tier: 'silver' },
-            { id: 'lv7', cat: 'Level', stat: 'maxLevel', target: 7, icon: '🚀', name: 'Sky High',    tier: 'gold' },
-            // Special
-            { id: 'fv1', cat: 'Special', stat: 'feverCount', target: 1,  icon: '🌡️', name: 'Fever Pitch',  tier: 'bronze' },
-            { id: 'dl1', cat: 'Special', stat: 'dailyDone',  target: 1,  icon: '📅', name: 'Daily Doer',   tier: 'bronze' },
-            { id: 'dl5', cat: 'Special', stat: 'dailyDone',  target: 5,  icon: '📅', name: 'Streak Seeker', tier: 'silver' }
+            { id:'sc_c2000',  cat:'Score', name:'First Grand',  tier:'bronze', icon:'🎯', hint:'Score 2,000 in CLASSIC mode',  check:S=>S.bestClassic>=2000 },
+            { id:'sc_c5000',  cat:'Score', name:'High Roller',  tier:'silver', icon:'🎯', hint:'Score 5,000 in CLASSIC mode',  check:S=>S.bestClassic>=5000 },
+            { id:'sc_c10000', cat:'Score', name:'Five Digits',  tier:'gold',   icon:'🏆', hint:'Score 10,000 in CLASSIC mode', check:S=>S.bestClassic>=10000 },
+            { id:'sc_c20000', cat:'Score', name:'Bridge Master',tier:'legend', icon:'👑', hint:'Score 20,000 in CLASSIC mode', check:S=>S.bestClassic>=20000 },
+            { id:'sc_h2000',  cat:'Score', name:'Hard Hitter',  tier:'silver', icon:'🔥', hint:'Score 2,000 in HARD mode',     check:S=>S.bestHard>=2000 },
+            { id:'sc_h5000',  cat:'Score', name:'Hard Boiled',  tier:'gold',   icon:'🔥', hint:'Score 5,000 in HARD mode',     check:S=>S.bestHard>=5000 },
+            { id:'cb10',  cat:'Combo', name:'Warming Up', tier:'bronze', icon:'🔥', hint:'Reach a 10 combo',  check:S=>S.maxCombo>=10 },
+            { id:'cb30',  cat:'Combo', name:'Chain Gang', tier:'silver', icon:'🔥', hint:'Reach a 30 combo',  check:S=>S.maxCombo>=30 },
+            { id:'cb60',  cat:'Combo', name:'Unbroken',   tier:'gold',   icon:'⚡', hint:'Reach a 60 combo',  check:S=>S.maxCombo>=60 },
+            { id:'cb100', cat:'Combo', name:'Century',    tier:'legend', icon:'💫', hint:'Reach a 100 combo', check:S=>S.maxCombo>=100 },
+            { id:'fever10', cat:'Combo', name:'Fever Dream', tier:'silver', icon:'🌡️', hint:'Trigger FEVER 10 times in a single run', check:(S,R)=>R.runMaxFever>=10 },
+            { id:'lv10',  cat:'Level', name:'Lift Off',               tier:'bronze', icon:'📈', hint:'Reach Level 10',  check:S=>S.maxLevel>=10 },
+            { id:'lv20',  cat:'Level', name:'Shapeshift',             tier:'bronze', icon:'📈', hint:'Reach Level 20',  check:S=>S.maxLevel>=20 },
+            { id:'lv30',  cat:'Level', name:'Through the Looking Glass', tier:'silver', icon:'🪞', hint:'Reach Level 30', check:S=>S.maxLevel>=30 },
+            { id:'lv40',  cat:'Level', name:'The Full Set',           tier:'silver', icon:'🎰', hint:'Reach Level 40',  check:S=>S.maxLevel>=40 },
+            { id:'lv50',  cat:'Level', name:'Halfway to the Sky',     tier:'gold',   icon:'🚀', hint:'Reach Level 50',  check:S=>S.maxLevel>=50 },
+            { id:'lv70',  cat:'Level', name:'Stratosphere',           tier:'gold',   icon:'🛰️', hint:'Reach Level 70',  check:S=>S.maxLevel>=70 },
+            { id:'lv100', cat:'Level', name:'Top of the World',       tier:'legend', icon:'🌌', hint:'Reach Level 100', check:S=>S.maxLevel>=100 },
+            { id:'fc_zebra',   cat:'First Contact', name:'Stripe Spotter',     tier:'bronze', icon:'🦓', hint:'Clear a zebra block for the first time',   check:S=>S.zebraMatched>=1 },
+            { id:'fc_speed',   cat:'First Contact', name:'Need for Speed',     tier:'bronze', icon:'⚡', hint:'Clear a speed block for the first time',   check:S=>S.speedCleared>=1 },
+            { id:'fc_ghost',   cat:'First Contact', name:'Who You Gonna Call', tier:'bronze', icon:'👻', hint:'Clear a ghost block for the first time',   check:S=>S.ghostCleared>=1 },
+            { id:'fc_change',  cat:'First Contact', name:'Color Shift',        tier:'bronze', icon:'🔄', hint:'Clear a change block for the first time',  check:S=>S.changeCleared>=1 },
+            { id:'fc_mirror',  cat:'First Contact', name:'Mirror Match',       tier:'bronze', icon:'🪞', hint:'Clear a mirror block for the first time',  check:S=>S.mirrorCleared>=1 },
+            { id:'fc_mystery', cat:'First Contact', name:'Box of Secrets',     tier:'bronze', icon:'🎁', hint:'Clear a mystery block for the first time', check:S=>S.mysteryCleared>=1 },
+            { id:'ms_zebra50',   cat:'Mastery', name:'Zebra Crossing',    tier:'silver', icon:'🦓', hint:'Clear 50 zebra blocks in total',   check:S=>S.zebraMatched>=50 },
+            { id:'ms_speed50',   cat:'Mastery', name:'Velocity',          tier:'silver', icon:'⚡', hint:'Clear 50 speed blocks in total',   check:S=>S.speedCleared>=50 },
+            { id:'ms_ghost40',   cat:'Mastery', name:'Ghost Hunter',      tier:'silver', icon:'👻', hint:'Clear 40 ghost blocks in total',   check:S=>S.ghostCleared>=40 },
+            { id:'ms_change40',  cat:'Mastery', name:'Kaleidoscope',      tier:'silver', icon:'🔄', hint:'Clear 40 change blocks in total',  check:S=>S.changeCleared>=40 },
+            { id:'ms_mirror30',  cat:'Mastery', name:'Reflection Expert', tier:'gold',   icon:'🪞', hint:'Clear 30 mirror blocks in total',  check:S=>S.mirrorCleared>=30 },
+            { id:'ms_mystery30', cat:'Mastery', name:'Mystery Solver',    tier:'gold',   icon:'🎁', hint:'Clear 30 mystery blocks in total', check:S=>S.mysteryCleared>=30 },
+            { id:'ms_heavy30',   cat:'Mastery', name:'Wall Breaker',      tier:'silver', icon:'🧱', hint:'Destroy 30 HEAVY blocks in total',  check:S=>S.heavyDestroyed>=30 },
+            { id:'ms_heavy100',  cat:'Mastery', name:'Demolition Expert', tier:'gold',   icon:'🔨', hint:'Destroy 100 HEAVY blocks in total', check:S=>S.heavyDestroyed>=100 },
+            { id:'tc_chameleon', cat:'Technique', name:'Chameleon',     tier:'gold',   icon:'🦎', hint:'Clear 5 change blocks in a row without missing',          check:(S,R)=>R.runChangeStreakMax>=5 },
+            { id:'tc_untouch',   cat:'Technique', name:'Untouchable',   tier:'legend', icon:'🛡️', hint:'Clear 60 blocks with no miss after reaching Level 30',     check:(S,R)=>R.noMissAfterLv30Max>=60 },
+            { id:'tc_clean50',   cat:'Technique', name:'Clean 50',      tier:'silver', icon:'✨', hint:'Clear 50 blocks in one run without missing once',         check:(S,R)=>R.noMissStreakMax>=50 },
+            { id:'tc_clean100',  cat:'Technique', name:'Clean 100',     tier:'gold',   icon:'✨', hint:'Clear 100 blocks in one run without missing once',        check:(S,R)=>R.noMissStreakMax>=100 },
+            { id:'tc_flaw200',   cat:'Technique', name:'Flawless 200',  tier:'legend', icon:'💎', hint:'Clear 200 blocks in one run without missing once',        check:(S,R)=>R.noMissStreakMax>=200 },
+            { id:'tc_coldstart', cat:'Technique', name:'Cold Start',    tier:'gold',   icon:'❄️', hint:'Clear 40 in a row without missing, after the safe time ends', check:(S,R)=>R.noMissAfterSafeMax>=40 },
+            { id:'tc_spotless',  cat:'Technique', name:'Spotless Start',tier:'gold',   icon:'🧼', hint:'Reach Level 30 without missing once',                     check:(S,R)=>R.reachedLv30NoMiss===true },
+            { id:'tc_memory',    cat:'Technique', name:'Memory Master', tier:'gold',   icon:'🧠', hint:'Clear 8 ghost blocks without missing in between',          check:(S,R)=>R.runGhostInStreakMax>=8 },
+            { id:'tc_spin',      cat:'Technique', name:'Spin Cycle',    tier:'gold',   icon:'🌀', hint:'Clear 8 change blocks during a single FEVER',              check:(S,R)=>R.runFeverChangeMax>=8 },
+            { id:'tc_coldread',  cat:'Technique', name:'Cold Read',     tier:'legend', icon:'🔮', hint:'Clear 15 mystery blocks without missing in between',       check:(S,R)=>R.runMysteryInStreakMax>=15 },
+            { id:'tc_reflex',    cat:'Technique', name:'Reflex King',   tier:'gold',   icon:'🏎️', hint:'Clear 15 speed blocks in one run',                        check:(S,R)=>R.runSpeedCount>=15 },
+            { id:'tc_galaxy',    cat:'Technique', name:'Galaxy Brain',  tier:'gold',   icon:'🌠', hint:'Clear 2 each of mirror, mystery, change & ghost in one run', check:(S,R)=>R.runMirrorCount>=2&&R.runMysteryCount>=2&&R.runChangeCount>=2&&R.runGhostCount>=2 },
+            { id:'tc_fullhouse', cat:'Technique', name:'Full House',    tier:'silver', icon:'🎴', hint:'Clear all 7 block types in a single run',                  check:(S,R)=>['normal','zebra','speed','ghost','change','mirror','mystery'].every(t=>R.runTypesCleared[t]) },
+            { id:'dd_play10',  cat:'Dedication', name:'Getting Started', tier:'bronze', icon:'🎮', hint:'Play 10 games',                      check:S=>S.plays>=10 },
+            { id:'dd_play50',  cat:'Dedication', name:'Regular',         tier:'silver', icon:'🎮', hint:'Play 50 games',                      check:S=>S.plays>=50 },
+            { id:'dd_play100', cat:'Dedication', name:'Devoted',         tier:'gold',   icon:'🎲', hint:'Play 100 games',                     check:S=>S.plays>=100 },
+            { id:'dd_daily7',  cat:'Dedication', name:'Weekly Warrior',  tier:'silver', icon:'📅', hint:'Complete the daily challenge 7 times',  check:S=>S.dailyDone>=7 },
+            { id:'dd_daily30', cat:'Dedication', name:'Daily Devotee',   tier:'gold',   icon:'📅', hint:'Complete the daily challenge 30 times', check:S=>S.dailyDone>=30 }
         ];
 
         function achProgress() {
@@ -2177,11 +2245,23 @@
         }
 
         // check & unlock; returns array of newly unlocked achievement objects
+        function buildRunObj() {
+            return {
+                runMaxFever, noMissStreakMax, noMissAfterLv30Max, noMissAfterSafeMax,
+                runChangeStreakMax, runGhostInStreakMax, runMysteryInStreakMax, runFeverChangeMax,
+                reachedLv30NoMiss,
+                runSpeedCount, runMirrorCount, runMysteryCount, runChangeCount, runGhostCount,
+                runTypesCleared
+            };
+        }
         function checkAchievements() {
+            const R = buildRunObj();
             const newly = [];
             for (const a of ACHIEVEMENTS) {
                 if (achUnlocked.includes(a.id)) continue;
-                if (achStatValue(a.stat) >= a.target) {
+                let ok = false;
+                try { ok = a.check(achStats, R); } catch (e) { ok = false; }
+                if (ok) {
                     achUnlocked.push(a.id);
                     newly.push(a);
                 }
@@ -2198,6 +2278,11 @@
             achStats.zebraMatched += runZebra;
             achStats.feverCount += runFever;
             achStats.rainbowCount += runRainbow;
+            achStats.speedCleared += runSpeedCount;
+            achStats.ghostCleared += runGhostCount;
+            achStats.changeCleared += runChangeCount;
+            achStats.mirrorCleared += runMirrorCount;
+            achStats.mysteryCleared += runMysteryCount;
             if (maxCombo > achStats.maxCombo) achStats.maxCombo = maxCombo;
             if (level > achStats.maxLevel) achStats.maxLevel = level;
             if (selectedMode === 'classic' && score > achStats.bestClassic) achStats.bestClassic = score;
@@ -2266,11 +2351,10 @@
                 for (const a of items) {
                     const got = achUnlocked.includes(a.id);
                     const col = ACH_TIERS[a.tier];
-                    const cur = Math.min(achStatValue(a.stat), a.target);
                     html += '<div class="ach-item' + (got ? ' got' : '') + '" style="' + (got ? '--tc:' + col : '') + '">'
                         + '<div class="ach-ic">' + a.icon + '</div>'
                         + '<div class="ach-info"><div class="ach-name">' + a.name + '</div>'
-                        + '<div class="ach-hint">' + (got ? 'UNLOCKED' : (cur + ' / ' + a.target)) + '</div></div>'
+                        + '<div class="ach-hint">' + (got ? 'UNLOCKED' : a.hint) + '</div></div>'
                         + '</div>';
                 }
                 html += '</div>';
@@ -2309,6 +2393,35 @@
             runZebra = 0;
             runFever = 0;
             runRainbow = 0;
+            runSpeed = 0;
+            runMirror = 0;
+            runMystery = 0;
+            runChange = 0;
+            runMaxFever = 0;
+            noMissStreak = 0;
+            runChangeStreak = 0;
+            runGhostInStreak = 0;
+            runMysteryInStreak = 0;
+            runFeverChange = 0;
+            runTypesCleared = {};
+            runMirrorCount = 0;
+            runMysteryCount = 0;
+            runChangeCount = 0;
+            runGhostCount = 0;
+            runSpeedCount = 0;
+            lv30Reached = false;
+            noMissAfterLv30 = 0;
+            missedThisRun = false;
+            safeEnded = false;
+            noMissAfterSafe = 0;
+            noMissStreakMax = 0;
+            noMissAfterLv30Max = 0;
+            noMissAfterSafeMax = 0;
+            runChangeStreakMax = 0;
+            runGhostInStreakMax = 0;
+            runMysteryInStreakMax = 0;
+            runFeverChangeMax = 0;
+            reachedLv30NoMiss = false;
             currentColorIndex = 0;
             dailyAdd('plays', 1);
             achStats.plays += 1;
@@ -2332,6 +2445,7 @@
             heavyBlockCooldown = 0;
             recoveryGauge = 0;
             lifeOneRescueCooldown = 0;
+            heavyBlockNextSpawnHold = 0;
             damageOverlayAlpha = 0;
             safeTime = selectedMode === 'zen' ? 0 : 120;
             saveChanceActive = false;
@@ -2632,6 +2746,11 @@
             let nextLevel = level + 1;
             while (score >= scoreForLevel(nextLevel)) {
                 level = nextLevel;
+                if (level >= 30 && !lv30Reached) {
+                    lv30Reached = true;
+                    noMissAfterLv30 = 0;
+                    if (!missedThisRun) reachedLv30NoMiss = true;
+                }
                 updateLevelUI();
                 addFloatingText('LEVEL UP!', canvas.width / window.devicePixelRatio / 2, 120, '#ffffff');
                 createLevelUpEffect();
@@ -2663,10 +2782,10 @@
         }
         
         function createBlockData(isPreview = false) {
+            const cfg = getLevelConfig(level);
             const rand = Math.random();
             let type = 'normal';
             let colorIndices = [Math.floor(Math.random() * COLORS.length)];
-            const cfg = getLevelConfig(level);
             
             if (cfg.effects.includes('zebra') && rand < 0.18) {
                 type = 'zebra';
@@ -2674,15 +2793,29 @@
                 let c2 = Math.floor(Math.random() * COLORS.length);
                 while (c2 === c1) c2 = Math.floor(Math.random() * COLORS.length);
                 colorIndices = [c1, c2];
-            } else if (cfg.effects.includes('rainbow') && rand < 0.10) {
-                type = 'rainbow';
-                colorIndices = [0, 1, 2];
-            } else if (cfg.effects.includes('ghost') && rand < 0.08) {
-                type = 'ghost';
-                colorIndices = [Math.floor(Math.random() * COLORS.length)];
             } else if (cfg.effects.includes('split') && rand < 0.12) {
                 type = 'split';
                 colorIndices = [Math.floor(Math.random() * COLORS.length)];
+            }
+            // Ghost: independent roll (otherwise the zebra threshold above swallows it)
+            if (type === 'normal' && cfg.effects.includes('ghost') && Math.random() < 0.12) {
+                type = 'ghost';
+            }
+            // Speed: a fast-falling variant of an otherwise-normal block
+            if (type === 'normal' && cfg.effects.includes('speed') && Math.random() < 0.13) {
+                type = 'speed';
+            }
+            // Mirror: displayed color is a decoy; the NEXT color is the real answer
+            if (type === 'normal' && cfg.effects.includes('mirror') && Math.random() < 0.10) {
+                type = 'mirror';
+            }
+            // Mystery: color is hidden ("?") until just before the bridge
+            if (type === 'normal' && cfg.effects.includes('mystery') && Math.random() < 0.10) {
+                type = 'mystery';
+            }
+            // Change: color cycles while falling; match whatever it shows on arrival
+            if (type === 'normal' && cfg.effects.includes('change') && Math.random() < 0.10) {
+                type = 'change';
             }
             return { colorIndices, type };
         }
@@ -2694,7 +2827,20 @@
             const leftX = (w - laneWidth) / 2;
             const bridgeY = h - 100;
             const estimateFramesToBridge = (block) => (bridgeY - (block.y + block.height)) / Math.max(0.001, block.speed);
-
+            const estimateFramesToResolve = (block) => {
+                const arrive = estimateFramesToBridge(block);
+                if (block.type !== 'heavy') return arrive;
+                const hitGap = Math.max(20, 28 / Math.max(0.001, block.speed));
+                return arrive + Math.max(0, (block.durability || 1) - 1) * hitGap;
+            };
+            const overlapsBridgeWindow = (a, b) => {
+                const gap = 26;
+                const aStart = estimateFramesToBridge(a);
+                const aEnd = estimateFramesToResolve(a);
+                const bStart = estimateFramesToBridge(b);
+                const bEnd = estimateFramesToResolve(b);
+                return aStart <= bEnd + gap && aEnd >= bStart - gap;
+            };
             // --- Scripted onboarding blocks (CLASSIC first play only) ---
             // block 1 & 2: same color as the bridge (succeed without tapping),
             // block 3: a different color (player must tap to match). All slower (75%).
@@ -2733,7 +2879,7 @@
                     height: 104,
                     speed: speed * 0.82
                 };
-                if (blocks.some(b => !b.passed && Math.abs(estimateFramesToBridge(candidateBlock) - estimateFramesToBridge(b)) <= 26)) {
+                if (blocks.some(b => !b.passed && overlapsBridgeWindow(candidateBlock, b))) {
                     spawnTimer = 8;
                     return;
                 }
@@ -2767,6 +2913,7 @@
                 if (selectedMode === 'zen') heavyBlockCooldown += 10;
                 if (lives === 1) heavyBlockCooldown += 10;
                 if (lives === 1 && recoveryGauge >= 7) heavyBlockCooldown += 8;
+                heavyBlockNextSpawnHold = Math.max(0, durability - 1) * 30;
                 return;
             }
             
@@ -2775,9 +2922,9 @@
             const candidateBlock = {
                 y: -90,
                 height: data.type === 'zebra' ? 72 : (data.type === 'rainbow' ? 56 : (data.type === 'ghost' ? 72 : 62)),
-                speed: speed * (0.9 + Math.random() * 0.2)
+                speed: speed * (0.9 + Math.random() * 0.2) * (data.type === 'speed' ? 1.8 : 1)
             };
-            if (blocks.some(b => !b.passed && Math.abs(estimateFramesToBridge(candidateBlock) - estimateFramesToBridge(b)) <= 26)) {
+            if (blocks.some(b => !b.passed && overlapsBridgeWindow(candidateBlock, b))) {
                 spawnTimer = 8;
                 return;
             }
@@ -2799,6 +2946,28 @@
             };
             if (data.type === 'zebra' && localStorage.getItem('colorBridgeZebraHintDone') !== '1') {
                 newBlock.tutType = 'zebra';
+            }
+            if (data.type === 'mirror' && localStorage.getItem('colorBridgeMirrorHintDone') !== '1') {
+                newBlock.tutType = 'mirror';
+            }
+            if (data.type === 'ghost' && localStorage.getItem('colorBridgeGhostHintDone') !== '1') {
+                newBlock.tutType = 'ghost';
+            }
+            if (data.type === 'speed' && localStorage.getItem('colorBridgeSpeedHintDone') !== '1') {
+                newBlock.tutType = 'speed';
+            }
+            if (data.type === 'mystery') {
+                newBlock.revealed = false;
+                if (localStorage.getItem('colorBridgeMysteryHintDone') !== '1') {
+                    newBlock.tutType = 'mystery';
+                }
+            }
+            if (data.type === 'change') {
+                newBlock.changeIndex = Math.floor(Math.random() * COLORS.length);
+                newBlock.changeTimer = 0;
+                if (localStorage.getItem('colorBridgeChangeHintDone') !== '1') {
+                    newBlock.tutType = 'change';
+                }
             }
             blocks.push(newBlock);
         }
@@ -2910,13 +3079,19 @@
             
             spawnTimer -= dt;
             if (heavyBlockCooldown > 0) heavyBlockCooldown -= dt;
+            if (heavyBlockNextSpawnHold > 0) heavyBlockNextSpawnHold -= dt;
             if (lifeOneRescueCooldown > 0) lifeOneRescueCooldown -= dt;
             const spawnRate = Math.max(22, (70 - difficulty * 5) * mode.spawnMult);
             if (spawnTimer <= 0) {
                 if (heavyBlockCooldown <= 0) {
                     const wasScripted = scriptedRemaining > 0;
-                    spawnBlock();
-                    spawnTimer = wasScripted ? 150 : (spawnRate + Math.random() * 16);
+                    if (heavyBlockNextSpawnHold > 0) {
+                        spawnTimer = heavyBlockNextSpawnHold;
+                        heavyBlockNextSpawnHold = 0;
+                    } else {
+                        spawnBlock();
+                        spawnTimer = wasScripted ? 150 : (spawnRate + Math.random() * 16);
+                    }
                 } else {
                     spawnTimer = Math.min(spawnRate + Math.random() * 8, 14 + heavyBlockCooldown * 0.3);
                 }
@@ -2946,6 +3121,8 @@
             if (safeTime > 0) {
                 safeTime -= dt;
                 if (safeTime <= 0) {
+                    safeEnded = true;
+                    noMissAfterSafe = 0;
                     ui.safeBadge.style.opacity = '0';
                 }
             }
@@ -2968,7 +3145,33 @@
                 }
                 b.rotation += cfg.effects.includes('fastspin') ? 0.06 * dt : 0.025 * dt;
                 b.pulse = Math.sin(timestamp * 0.012) * 0.08;
-                if (b.type === 'ghost') b.opacity = 0.35 + Math.sin(timestamp * 0.008) * 0.15;
+                if (b.type === 'ghost') {
+                    const dist = bridgeY - (b.y + b.height);
+                    if (dist < 90) {
+                        const t = Math.max(0, Math.min(1, 1 - dist / 90));
+                        b.opacity = 0.22 + t * 0.78;
+                    } else if (dist < 220) {
+                        const t = (dist - 90) / 130;
+                        b.opacity = 0.02 + t * 0.18;
+                    } else if (dist < 340) {
+                        const t = (dist - 220) / 120;
+                        b.opacity = 0.008 + (1 - t) * 0.08;
+                    } else {
+                        b.opacity = Math.max(0.001, 0.002 + Math.sin(timestamp * 0.0016 + b.wobbleOffset) * 0.002);
+                    }
+                }
+                if (b.type === 'change') {
+                    // Cycle the color while falling (~0.5s per step). Match what it shows on arrival.
+                    b.changeTimer = (b.changeTimer || 0) + dt;
+                    if (b.changeTimer >= 90) {
+                        b.changeTimer -= 90;
+                        b.changeIndex = ((b.changeIndex || 0) + 1) % COLORS.length;
+                    }
+                }
+                if (b.type === 'mystery' && !b.revealed) {
+                    // Reveal the real color a bit before the bridge.
+                    if (bridgeY - (b.y + b.height) < 130) b.revealed = true;
+                }
                 if (cfg.effects.includes('wobble')) {
                     b.x += Math.sin(timestamp * 0.005 + b.wobbleOffset) * 0.4 * dt;
                 }
@@ -2980,7 +3183,11 @@
                 
                 if (!b.passed && !b.saveChance && (b.invuln || 0) <= 0 && b.y + b.height >= bridgeY && b.y <= bridgeY + 30) {
                     const currentColor = COLORS[currentColorIndex].name;
-                    const blockColors = b.colorIndices.map(i => COLORS[i].name);
+                    const blockColors = b.type === 'mirror'
+                        ? [COLORS[(b.colorIndices[0] + 1) % COLORS.length].name]
+                        : (b.type === 'change'
+                            ? [COLORS[b.changeIndex % COLORS.length].name]
+                            : b.colorIndices.map(i => COLORS[i].name));
                     const isMatch = blockColors.includes(currentColor);
                     const isRainbow = b.type === 'rainbow';
                     
@@ -3010,6 +3217,18 @@
                             blocksCleared++;
                             dailyAdd('heavy', 1);
                             runHeavy++;
+                            runTypesCleared['heavy'] = 1;
+                            runChangeStreak = 0;
+                            noMissStreak++;
+                            if (noMissStreak > noMissStreakMax) noMissStreakMax = noMissStreak;
+                            if (lv30Reached) {
+                                noMissAfterLv30++;
+                                if (noMissAfterLv30 > noMissAfterLv30Max) noMissAfterLv30Max = noMissAfterLv30;
+                            }
+                            if (safeEnded) {
+                                noMissAfterSafe++;
+                                if (noMissAfterSafe > noMissAfterSafeMax) noMissAfterSafeMax = noMissAfterSafe;
+                            }
                             const heavyDestroyPoints = Math.floor(140 * mode.scoreMult);
                             score += heavyDestroyPoints;
                             ui.score.textContent = score;
@@ -3035,6 +3254,24 @@
                         combo++;
                         if (combo > maxCombo) maxCombo = combo;
                         blocksCleared++;
+                        runTypesCleared[b.type] = 1;
+                        if (b.type === 'ghost') {
+                            runGhostCount++;
+                            runGhostInStreak++;
+                            if (runGhostInStreak > runGhostInStreakMax) runGhostInStreakMax = runGhostInStreak;
+                        }
+                        if (b.type !== 'change') runChangeStreak = 0;
+                        noMissStreak++;
+                        if (noMissStreak > noMissStreakMax) noMissStreakMax = noMissStreak;
+                        if (lv30Reached) {
+                            noMissAfterLv30++;
+                            if (noMissAfterLv30 > noMissAfterLv30Max) noMissAfterLv30Max = noMissAfterLv30;
+                        }
+                        if (safeEnded) {
+                            noMissAfterSafe++;
+                            if (noMissAfterSafe > noMissAfterSafeMax) noMissAfterSafeMax = noMissAfterSafe;
+                        }
+                        if (runFever > runMaxFever) runMaxFever = runFever;
 
                         if (saveChanceActive && b === saveChanceBlock) {
                             saveChanceActive = false;
@@ -3052,6 +3289,8 @@
                             feverTimer = 1;
                             ui.feverBadge.style.opacity = '1';
                             runFever++;
+                            runFeverChange = 0;
+                            if (runFever > runMaxFever) runMaxFever = runFever;
                         }
 
                         if (combo > 0 && combo % 15 === 0 && !rainbowBridgeActive) {
@@ -3072,6 +3311,50 @@
                         updateRecoveryGauge(1);
                         checkLevelUp();
                         if (b.type === 'zebra') { dailyAdd('zebra', 1); runZebra++; }
+                        if (b.type === 'speed') {
+                            runSpeed++;
+                            runSpeedCount++;
+                            runTypesCleared['speed'] = 1;
+                            const sb = Math.floor(15 * mode.scoreMult);
+                            score += sb;
+                            ui.score.textContent = score;
+                            addFloatingText('FAST! +' + sb, w / 2, bridgeY - 78, '#ffdd33');
+                        }
+                        if (b.type === 'mirror') {
+                            runMirror++;
+                            runMirrorCount++;
+                            runTypesCleared['mirror'] = 1;
+                            const mb = Math.floor(20 * mode.scoreMult);
+                            score += mb;
+                            ui.score.textContent = score;
+                            addFloatingText('MIRROR! +' + mb, w / 2, bridgeY - 78, '#7fd8ff');
+                        }
+                        if (b.type === 'mystery') {
+                            runMystery++;
+                            runMysteryCount++;
+                            runTypesCleared['mystery'] = 1;
+                            runMysteryInStreak++;
+                            if (runMysteryInStreak > runMysteryInStreakMax) runMysteryInStreakMax = runMysteryInStreak;
+                            const myb = Math.floor(20 * mode.scoreMult);
+                            score += myb;
+                            ui.score.textContent = score;
+                            addFloatingText('MYSTERY! +' + myb, w / 2, bridgeY - 78, '#d6a8ff');
+                        }
+                        if (b.type === 'change') {
+                            runChange++;
+                            runChangeCount++;
+                            runTypesCleared['change'] = 1;
+                            runChangeStreak++;
+                            if (runChangeStreak > runChangeStreakMax) runChangeStreakMax = runChangeStreak;
+                            if (feverActive) {
+                                runFeverChange++;
+                                if (runFeverChange > runFeverChangeMax) runFeverChangeMax = runFeverChange;
+                            }
+                            const cb = Math.floor(18 * mode.scoreMult);
+                            score += cb;
+                            ui.score.textContent = score;
+                            addFloatingText('CHANGE! +' + cb, w / 2, bridgeY - 78, '#8affc8');
+                        }
                         dailySetMax('score', score, selectedMode);
                         dailySetMax('combo', combo);
 
@@ -3115,6 +3398,12 @@
                             b.passed = true;
                             combo = 0;
                             ui.combo.style.opacity = '0';
+                            noMissStreak = 0;
+                            runChangeStreak = 0;
+                            runGhostInStreak = 0;
+                            runMysteryInStreak = 0;
+                            noMissAfterLv30 = 0;
+                            noMissAfterSafe = 0;
                             recoveryGauge = Math.max(0, recoveryGauge - 3);
                             lifeOneRescueCooldown = 72;
                             updateRecoveryUI();
@@ -3141,6 +3430,13 @@
                             shake = 14;
                             combo = 0;
                             ui.combo.style.opacity = '0';
+                            noMissStreak = 0;
+                            runChangeStreak = 0;
+                            runGhostInStreak = 0;
+                            runMysteryInStreak = 0;
+                            noMissAfterLv30 = 0;
+                            noMissAfterSafe = 0;
+                            missedThisRun = true;
                             recoveryGauge = Math.max(0, recoveryGauge - 3);
                             updateRecoveryUI();
                             ui.saveBadge.style.opacity = '1';
@@ -3158,6 +3454,13 @@
                         shake = 22;
                         combo = 0;
                         ui.combo.style.opacity = '0';
+                        noMissStreak = 0;
+                        runChangeStreak = 0;
+                        runGhostInStreak = 0;
+                        runMysteryInStreak = 0;
+                        noMissAfterLv30 = 0;
+                        noMissAfterSafe = 0;
+                        missedThisRun = true;
                         recoveryGauge = Math.max(0, recoveryGauge - 3);
                         updateRecoveryUI();
                         b.passed = true;
@@ -3182,6 +3485,12 @@
             
             blocks = blocks.filter(b => {
                 if (b.y > h + 50 && !b.passed) {
+                    noMissStreak = 0;
+                    runChangeStreak = 0;
+                    runGhostInStreak = 0;
+                    runMysteryInStreak = 0;
+                    noMissAfterLv30 = 0;
+                    noMissAfterSafe = 0;
                     if (saveChanceActive && b === saveChanceBlock) {
                         saveChanceActive = false;
                         saveChanceBlock = null;
@@ -3337,6 +3646,15 @@
                     ctx.strokeRect(-size/2, -size/2, size, size);
                     ctx.restore();
                     continue;
+                } else if (pb.type === 'mystery') {
+                    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                    ctx.shadowColor = 'rgba(255,255,255,0.5)';
+                    ctx.shadowBlur = 8;
+                } else if (pb.type === 'change') {
+                    const ci = (pb.colorIndices[0]) % COLORS.length;
+                    ctx.fillStyle = COLORS[ci].hex;
+                    ctx.shadowColor = COLORS[ci].hex;
+                    ctx.shadowBlur = 8;
                 } else {
                     ctx.fillStyle = COLORS[pb.colorIndices[0]].hex;
                     ctx.shadowColor = COLORS[pb.colorIndices[0]].hex;
@@ -3345,13 +3663,60 @@
                 ctx.beginPath();
                 ctx.roundRect(-size/2, -size/2, size, size, 6);
                 ctx.fill();
+                if (pb.type === 'speed') {
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                    ctx.lineWidth = 1.6;
+                    ctx.lineCap = 'round';
+                    const cw = size * 0.2;
+                    for (let k = 0; k < 2; k++) {
+                        const oy = -size * 0.12 + k * (size * 0.24);
+                        ctx.beginPath();
+                        ctx.moveTo(-cw, oy - cw * 0.5);
+                        ctx.lineTo(0, oy + cw * 0.4);
+                        ctx.lineTo(cw, oy - cw * 0.5);
+                        ctx.stroke();
+                    }
+                }
+                if (pb.type === 'mirror') {
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -size * 0.32);
+                    ctx.lineTo(0, size * 0.32);
+                    ctx.stroke();
+                    ctx.fillStyle = '#fff';
+                    const aw = size * 0.14;
+                    ctx.beginPath();
+                    ctx.moveTo(-aw * 0.4, 0); ctx.lineTo(-aw * 1.1, -aw * 0.55); ctx.lineTo(-aw * 1.1, aw * 0.55); ctx.closePath(); ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(aw * 0.4, 0); ctx.lineTo(aw * 1.1, -aw * 0.55); ctx.lineTo(aw * 1.1, aw * 0.55); ctx.closePath(); ctx.fill();
+                }
+                if (pb.type === 'mystery') {
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                    ctx.font = '900 ' + Math.floor(size * 0.62) + 'px Montserrat, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('?', 0, size * 0.02);
+                    ctx.textBaseline = 'alphabetic';
+                }
+                if (pb.type === 'change') {
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                    ctx.lineWidth = 1.5;
+                    ctx.lineCap = 'round';
+                    const r = size * 0.2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r, -0.15 * Math.PI, 1.0 * Math.PI);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r, 0.85 * Math.PI, 2.0 * Math.PI);
+                    ctx.stroke();
+                }
                 ctx.restore();
             }
-            
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '700 10px Montserrat, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('NEXT', w/2, 16);
         }
         
         function drawBlock(b, cfg) {
@@ -3405,32 +3770,302 @@
                 ctx.shadowBlur = 0;
                 ctx.fillText('RAINBOW', 0, 0);
             } else if (b.type === 'zebra') {
+                const hw = b.width / 2;
+                const hh = b.height / 2;
                 const stripeCount = 4;
                 const stripeW = b.width / stripeCount;
+                ctx.save();
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 10);
+                ctx.clip();
                 for (let i = 0; i < stripeCount; i++) {
                     const colorIdx = b.colorIndices[i % b.colorIndices.length];
                     ctx.fillStyle = COLORS[colorIdx].hex;
-                    ctx.fillRect(-b.width/2 + i * stripeW, -b.height/2, stripeW, b.height);
+                    ctx.fillRect(-hw + i * stripeW, -hh, stripeW, b.height);
                 }
+                ctx.restore();
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(-b.width/2, -b.height/2, b.width, b.height);
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('!', 0, 0);
-            } else if (b.type === 'ghost') {
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 10);
+                ctx.stroke();
+            } else if (b.type === 'speed') {
                 const color = COLORS[b.colorIndices[0]];
+                // motion trail (faded copies above, like a speed streak)
+                for (let t = 1; t <= 3; t++) {
+                    ctx.globalAlpha = b.opacity * (0.22 - t * 0.05);
+                    ctx.fillStyle = color.hex;
+                    ctx.beginPath();
+                    ctx.roundRect(-b.width/2, -b.height/2 - t * b.height * 0.42, b.width, b.height, 10);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = b.opacity;
+                // main body
                 ctx.fillStyle = color.hex;
                 ctx.shadowColor = color.hex;
-                ctx.shadowBlur = 25;
+                ctx.shadowBlur = 22;
                 ctx.beginPath();
                 ctx.roundRect(-b.width/2, -b.height/2, b.width, b.height, 10);
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-                ctx.lineWidth = 2;
+                ctx.shadowBlur = 0;
+                // bright glowing border
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.roundRect(-b.width/2, -b.height/2, b.width, b.height, 10);
                 ctx.stroke();
+                ctx.shadowBlur = 0;
+                // bold downward chevrons
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                const cw = b.width * 0.28;
+                for (let k = 0; k < 3; k++) {
+                    const oy = -b.height * 0.24 + k * (b.height * 0.24);
+                    ctx.beginPath();
+                    ctx.moveTo(-cw, oy - cw * 0.55);
+                    ctx.lineTo(0, oy + cw * 0.55);
+                    ctx.lineTo(cw, oy - cw * 0.55);
+                    ctx.stroke();
+                }
+            } else if (b.type === 'mirror') {
+                const color = COLORS[b.colorIndices[0]];
+                const hw = b.width / 2, hh = b.height / 2;
+                const baseGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+                baseGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+                baseGrad.addColorStop(0.18, color.hex);
+                baseGrad.addColorStop(0.52, 'rgba(255,255,255,0.14)');
+                baseGrad.addColorStop(0.82, color.hex);
+                baseGrad.addColorStop(1, 'rgba(18,22,34,0.58)');
+                ctx.fillStyle = baseGrad;
+                ctx.shadowColor = color.glow;
+                ctx.shadowBlur = 24;
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 12);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 12);
+                ctx.clip();
+
+                const tintGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+                tintGrad.addColorStop(0, 'rgba(255,255,255,0.18)');
+                tintGrad.addColorStop(0.48, 'rgba(255,255,255,0.03)');
+                tintGrad.addColorStop(1, 'rgba(0,0,0,0.26)');
+                ctx.fillStyle = tintGrad;
+                ctx.fillRect(-hw, -hh, b.width, b.height);
+
+                const shineGrad = ctx.createLinearGradient(-hw * 0.95, -hh * 0.75, hw * 0.95, hh * 0.7);
+                shineGrad.addColorStop(0, 'rgba(255,255,255,0)');
+                shineGrad.addColorStop(0.28, 'rgba(255,255,255,0.08)');
+                shineGrad.addColorStop(0.5, 'rgba(255,255,255,0.55)');
+                shineGrad.addColorStop(0.68, 'rgba(255,255,255,0.12)');
+                shineGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = shineGrad;
+                ctx.fillRect(-hw, -hh, b.width, b.height);
+
+                const edgeGlow = ctx.createLinearGradient(-hw, 0, hw, 0);
+                edgeGlow.addColorStop(0, 'rgba(255,255,255,0.22)');
+                edgeGlow.addColorStop(0.22, 'rgba(255,255,255,0.04)');
+                edgeGlow.addColorStop(0.78, 'rgba(255,255,255,0.06)');
+                edgeGlow.addColorStop(1, 'rgba(255,255,255,0.3)');
+                ctx.fillStyle = edgeGlow;
+                ctx.fillRect(-hw, -hh, b.width, b.height);
+                ctx.restore();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, -hh + 6);
+                ctx.lineTo(0, hh - 6);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                const aw = b.width * 0.15;
+                ctx.beginPath();
+                ctx.moveTo(-aw * 0.25, -aw * 0.65);
+                ctx.lineTo(-aw * 1.05, 0);
+                ctx.lineTo(-aw * 0.25, aw * 0.65);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(aw * 0.25, -aw * 0.65);
+                ctx.lineTo(aw * 1.05, 0);
+                ctx.lineTo(aw * 0.25, aw * 0.65);
+                ctx.stroke();
+
+                const sx = hw * 0.32;
+                const sy = -hh * 0.24;
+                ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(sx - 7, sy);
+                ctx.lineTo(sx + 7, sy);
+                ctx.moveTo(sx, sy - 7);
+                ctx.lineTo(sx, sy + 7);
+                ctx.moveTo(sx - 4.5, sy - 4.5);
+                ctx.lineTo(sx + 4.5, sy + 4.5);
+                ctx.moveTo(sx + 4.5, sy - 4.5);
+                ctx.lineTo(sx - 4.5, sy + 4.5);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.96)';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = color.hex;
+                ctx.shadowBlur = 14;
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 12);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            } else if (b.type === 'mystery') {
+                const hw = b.width / 2, hh = b.height / 2;
+                if (b.revealed) {
+                    // revealed: behaves like a normal block in its real color
+                    const color = COLORS[b.colorIndices[0]];
+                    ctx.fillStyle = color.hex;
+                    ctx.shadowColor = color.hex;
+                    ctx.shadowBlur = 15;
+                    ctx.beginPath();
+                    ctx.roundRect(-hw, -hh, b.width, b.height, 10);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.beginPath();
+                    ctx.roundRect(-hw + 4, -hh + 4, b.width - 8, b.height / 2 - 4, 6);
+                    ctx.fill();
+                } else {
+                    // hidden: translucent white shell, only the shape + "?" visible
+                    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+                    ctx.shadowColor = 'rgba(255,255,255,0.5)';
+                    ctx.shadowBlur = 14;
+                    ctx.beginPath();
+                    ctx.roundRect(-hw, -hh, b.width, b.height, 10);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.roundRect(-hw, -hh, b.width, b.height, 10);
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                    ctx.font = '900 ' + Math.floor(b.height * 0.55) + 'px Montserrat, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(255,255,255,0.6)';
+                    ctx.shadowBlur = 10;
+                    ctx.fillText('?', 0, b.height * 0.02);
+                    ctx.shadowBlur = 0;
+                }
+            } else if (b.type === 'change') {
+                // normal block design, but in its current (cycling) color
+                const color = COLORS[b.changeIndex % COLORS.length];
+                const hw = b.width / 2, hh = b.height / 2;
+                ctx.fillStyle = color.hex;
+                ctx.shadowColor = color.hex;
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 10);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.beginPath();
+                ctx.roundRect(-hw + 4, -hh + 4, b.width - 8, b.height / 2 - 4, 6);
+                ctx.fill();
+                // subtle cyclic-arrows mark so it's identifiable as a CHANGE block
+                ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+                ctx.lineWidth = 2.2;
+                ctx.lineCap = 'round';
+                const r = b.width * 0.17;
+                ctx.beginPath();
+                ctx.arc(0, 0, r, -0.15 * Math.PI, 1.05 * Math.PI);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0.85 * Math.PI, 2.05 * Math.PI);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                const ah = b.width * 0.07;
+                ctx.beginPath();
+                ctx.moveTo(r, -ah * 1.4);
+                ctx.lineTo(r + ah, ah * 0.2);
+                ctx.lineTo(r - ah, ah * 0.2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(-r, ah * 1.4);
+                ctx.lineTo(-r - ah, -ah * 0.2);
+                ctx.lineTo(-r + ah, -ah * 0.2);
+                ctx.closePath();
+                ctx.fill();
+            } else if (b.type === 'ghost') {
+                const color = COLORS[b.colorIndices[0]];
+                const hw = b.width / 2;
+                const hh = b.height / 2;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 16);
+                ctx.clip();
+
+                const auraGrad = ctx.createRadialGradient(0, -hh * 0.08, b.width * 0.08, 0, 0, b.width * 0.9);
+                auraGrad.addColorStop(0, color.glow);
+                auraGrad.addColorStop(0.34, 'rgba(255,255,255,0.36)');
+                auraGrad.addColorStop(0.62, color.hex);
+                auraGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = auraGrad;
+                ctx.fillRect(-hw, -hh, b.width, b.height);
+
+                const shellGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+                shellGrad.addColorStop(0, 'rgba(255,255,255,0.98)');
+                shellGrad.addColorStop(0.52, 'rgba(255,255,255,0.94)');
+                shellGrad.addColorStop(1, 'rgba(248,248,248,0.92)');
+                ctx.fillStyle = shellGrad;
+                ctx.beginPath();
+                ctx.moveTo(0, -hh * 0.72);
+                ctx.bezierCurveTo(hw * 0.38, -hh * 0.78, hw * 0.66, -hh * 0.34, hw * 0.64, hh * 0.16);
+                ctx.bezierCurveTo(hw * 0.62, hh * 0.52, hw * 0.50, hh * 0.74, hw * 0.34, hh * 0.80);
+                ctx.bezierCurveTo(hw * 0.24, hh * 0.84, hw * 0.18, hh * 0.71, hw * 0.10, hh * 0.62);
+                ctx.bezierCurveTo(hw * 0.04, hh * 0.78, -hw * 0.02, hh * 0.86, -hw * 0.12, hh * 0.76);
+                ctx.bezierCurveTo(-hw * 0.23, hh * 0.66, -hw * 0.30, hh * 0.84, -hw * 0.43, hh * 0.78);
+                ctx.bezierCurveTo(-hw * 0.60, hh * 0.72, -hw * 0.66, hh * 0.42, -hw * 0.64, hh * 0.12);
+                ctx.bezierCurveTo(-hw * 0.62, -hh * 0.36, -hw * 0.38, -hh * 0.76, 0, -hh * 0.72);
+                ctx.closePath();
+                ctx.fill();
+
+                const mistGrad = ctx.createRadialGradient(0, hh * 0.08, 0, 0, hh * 0.08, b.width * 0.46);
+                mistGrad.addColorStop(0, color.hex);
+                mistGrad.addColorStop(0.46, 'rgba(255,255,255,0.20)');
+                mistGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = mistGrad;
+                ctx.beginPath();
+                ctx.ellipse(0, hh * 0.1, hw * 0.38, hh * 0.38, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                ctx.fillStyle = 'rgba(22,22,28,0.92)';
+                ctx.beginPath();
+                ctx.ellipse(-hw * 0.11, -hh * 0.02, hw * 0.055, hh * 0.11, 0, 0, Math.PI * 2);
+                ctx.ellipse(hw * 0.11, -hh * 0.02, hw * 0.055, hh * 0.11, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(22,22,28,0.9)';
+                ctx.lineWidth = 2.1;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.arc(0, hh * 0.10, hw * 0.10, 0.18 * Math.PI, 0.82 * Math.PI, false);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(190,190,190,0.75)';
+                ctx.lineWidth = 2.6;
+                ctx.shadowColor = color.glow;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.roundRect(-hw, -hh, b.width, b.height, 16);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
             } else {
                 const color = COLORS[b.colorIndices[0]];
                 ctx.fillStyle = color.hex;
