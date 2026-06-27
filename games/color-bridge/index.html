@@ -1380,17 +1380,14 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             init(dataModulePromise) {
                 if (this.initPromise) return this.initPromise;
                 this.primeLocalCache();
-                console.log('[GameStorage] fallback = localStorage');
                 this.initPromise = (async () => {
                     try {
                         const dataModule = await Promise.resolve(dataModulePromise).catch(() => null);
                         if (!dataModule) {
-                            console.log('[GameStorage] CrazyGames Data unavailable, staying on localStorage');
                             return false;
                         }
                         this.dataModule = dataModule;
                         this.usingCrazyGamesData = true;
-                        console.log('[GameStorage] CrazyGames Data available');
                         await this.syncPersistentKeys();
                         if (typeof applyPersistentStateFromStorage === 'function') applyPersistentStateFromStorage();
                         return true;
@@ -1796,7 +1793,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                         }
                         await Promise.resolve(this.sdk.init && this.sdk.init());
                         this.data = this.sdk.data || this.sdk.dataModule || (this.sdk.modules && this.sdk.modules.data) || null;
-                        console.log('CrazyGames SDK initialized', { hasData: !!this.data });
                         return this.data;
                     } catch (e) {
                         console.warn('CrazyGames SDK init failed:', e);
@@ -2455,8 +2451,13 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         window.addEventListener('load', () => {
             const sdkInit = CG.init();
             sdkInit.then(() => {
+                // Report the loading window to CrazyGames. Assets are inlined, so the game is
+                // already playable by the time 'load' fires; bracket it so CrazyGames knows
+                // loading is complete and gameplay can start. Both calls no-op without the SDK.
+                CG.loadingStart();
                 CG.syncMuteAudio();
                 CG.registerSettingsChangeListener();
+                CG.loadingStop();
             }).catch(() => {});
             GameStorage.init(sdkInit.then(() => CG.getDataModule()));
             resolvePlayerId();
