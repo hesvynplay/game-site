@@ -1200,6 +1200,7 @@
         }
         let rankPeriod = 'daily';
         let playerName = '';
+        let playerId = '';
         let lastScoreId = null;
         let runStartAt = 0;
         let runSessionId = '';
@@ -1221,7 +1222,8 @@
             zebraHint: 'colorBridgeZebraHintDone',
             scriptDone: 'colorBridgeScriptDone',
             playerName: 'colorBridgeName',
-            anonName: 'colorBridgeAnonName'
+            anonName: 'colorBridgeAnonName',
+            playerId: 'colorBridgePlayerId'
         };
         const PERSISTENT_KEYS = Object.values(STORAGE_KEYS);
         const GameStorage = {
@@ -1631,6 +1633,7 @@
             loadData();
             loadDaily();
             loadAchStats();
+            resolvePlayerId();
             if (ui.playerNameInput) {
                 const saved = GameStorage.getItem(STORAGE_KEYS.playerName) || '';
                 if (saved) ui.playerNameInput.value = saved;
@@ -2423,6 +2426,7 @@
                 requestAnimationFrame(() => CG.loadingStop());
             }).catch(() => {});
             GameStorage.init(sdkInit.then(() => CG.getDataModule()));
+            resolvePlayerId();
             SoundManager.init();
         });
         
@@ -2736,23 +2740,43 @@
             return 's_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
         }
 
+        function createPlayerId() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return 'p_' + window.crypto.randomUUID().replace(/-/g, '');
+            }
+            return 'p_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
+
+        function resolvePlayerId() {
+            let id = GameStorage.getItem(STORAGE_KEYS.playerId) || '';
+            if (!id) {
+                id = createPlayerId();
+                GameStorage.setItem(STORAGE_KEYS.playerId, id);
+            }
+            playerId = id;
+            return id;
+        }
+
         let lastSubmitAt = 0;
-        async function submitScore(scoreValue, modeValue, sessionId, playTime, blocksValue, comboValue) {
+        async function submitScore(scoreValue, modeValue, playerIdValue, sessionId, playTime, blocksValue, comboValue) {
             const mode = String(modeValue || '').toLowerCase();
             if (mode !== 'classic' && mode !== 'hard') return null;
             const now = Date.now();
             if (now - lastSubmitAt < 1500) throw new Error('rate_limited');
             lastSubmitAt = now;
             const safeName = sanitizeScoreName(playerName || resolvePlayerName());
+            const safePlayerId = String(playerIdValue || '').trim();
             const payload = {
+                name: safeName,
                 score: Math.max(0, Math.min(50000, Math.floor(Number(scoreValue) || 0))),
                 mode,
+                playerId: safePlayerId,
                 sessionId: String(sessionId || ''),
                 playTime: Math.max(0, Math.min(3600, Math.floor(Number(playTime) || 0))),
                 blocksCleared: Math.max(0, Math.min(5000, Math.floor(Number(blocksValue) || 0))),
-                maxCombo: Math.max(0, Math.min(9999, Math.floor(Number(comboValue) || 0))),
-                name: safeName
+                maxCombo: Math.max(0, Math.min(9999, Math.floor(Number(comboValue) || 0)))
             };
+            if (!payload.playerId || !/^p_[a-zA-Z0-9]+$/.test(payload.playerId)) throw new Error('invalid_player_id');
             if (!payload.sessionId) throw new Error('invalid_session');
             if (!payload.name || payload.name.length > 20) throw new Error('invalid_name');
             if (!/^[a-zA-Z0-9 _.-]+$/.test(payload.name)) throw new Error('invalid_name_chars');
@@ -3087,7 +3111,7 @@
             return name;
         }
 
-        function renderRankingRows(rows, selfName, selfId = null) {
+        function renderRankingRows(rows, selfPlayerId, selfName) {
             ui.rankingList.innerHTML = '';
             ui.rankingList.scrollTop = 0;
             if (!rows || rows.length === 0) {
@@ -3096,19 +3120,16 @@
             }
             let selfRank = -1;
             const frag = document.createDocumentFragment();
+            const hasPlayerIds = rows.some(r => r.player_id);
             for (let i = 0; i < rows.length; i++) {
                 const r = rows[i];
-                const isSelf = selfRank === -1 && ((selfId != null && r.id === selfId) || (selfId == null && selfName != null && r.name === selfName));
+                const isSelf = selfRank === -1 && (
+                    (selfPlayerId && r.player_id && r.player_id === selfPlayerId) ||
+                    (!hasPlayerIds && selfName != null && r.name === selfName)
+                );
                 if (isSelf) selfRank = i + 1;
             }
-            let start = 0;
-            let end = Math.min(rows.length, 10);
-            if (selfRank > 0) {
-                start = Math.max(0, selfRank - 3);
-                end = Math.min(rows.length, start + 7);
-                start = Math.max(0, end - 7);
-            }
-            for (let i = start; i < end; i++) {
+            for (let i = 0; i < rows.length; i++) {
                 const r = rows[i];
                 const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
                 const isSelf = (i + 1) === selfRank;
@@ -3124,13 +3145,14 @@
             return selfRank;
         }
 
-        // Keep only each player's best score (dedup by name), preserving score order.
-        function dedupByBest(rows) {
+        // Keep only each player's best score (dedup by player_id; fallback to name for legacy rows), preserving score order.
+        function dedupByPlayerBest(rows) {
             const seen = new Set();
             const result = [];
             for (const r of rows) {
-                if (seen.has(r.name)) continue;
-                seen.add(r.name);
+                const key = r.player_id ? `pid:${r.player_id}` : `name:${r.name}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
                 result.push(r);
             }
             return result;
@@ -3143,7 +3165,7 @@
                 ui.rankSummary.textContent = `${label}  #${selfRank}`;
             } else {
                 ui.rankSummary.classList.add('out');
-                ui.rankSummary.textContent = `${label}  OUT OF RANK`;
+                ui.rankSummary.textContent = `${label}  OUT OF TOP 100`;
             }
         }
 
@@ -3159,15 +3181,15 @@
             try {
                 const { data, error } = await sbClient
                     .from('scores')
-                    .select('id, name, score')
+                    .select('id, name, score, player_id')
                     .eq('mode', selectedMode)
                     .gte('created_at', periodStartISO(rankPeriod))
                     .order('score', { ascending: false })
                     .order('created_at', { ascending: true })
                     .limit(1000);
                 if (error) throw error;
-                const best = dedupByBest(data || []).slice(0, 100);
-                const selfRank = renderRankingRows(best, playerName, lastScoreId);
+                const best = dedupByPlayerBest(data || []).slice(0, 100);
+                const selfRank = renderRankingRows(best, playerId, playerName);
                 setRankSummary(selfRank);
             } catch (e) {
                 console.warn('fetch ranking failed:', e);
@@ -3183,7 +3205,6 @@
         }
 
         async function submitAndShowRanking() {
-            lastScoreId = null;
             rankPeriod = 'daily';
             updateRankTabsUI();
 
@@ -3191,8 +3212,7 @@
             if (rankable) {
                 try {
                     const playTime = Math.max(1, Math.floor((performance.now() - (runStartAt || performance.now())) / 1000));
-                    const result = await submitScore(score, selectedMode, runSessionId, playTime, blocksCleared, maxCombo);
-                    if (result && result.id) lastScoreId = result.id;
+                    await submitScore(score, selectedMode, playerId, runSessionId, playTime, blocksCleared, maxCombo);
                 } catch (e) {
                     console.warn('submit score failed:', e);
                 }
