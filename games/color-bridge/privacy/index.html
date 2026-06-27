@@ -5,34 +5,63 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Color Bridge Privacy Policy | Hesvyn Play</title>
+  <title>Color Bridge Privacy Policy</title>
   <link rel="stylesheet" href="../../../style.css">
+
+  <style>
+    .privacy-only {
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 48px;
+    }
+
+    .privacy-card {
+      width: min(900px, 94%);
+    }
+
+    .privacy-card h1 {
+      margin-top: 18px;
+    }
+
+    .privacy-card .policy-date {
+      text-align: center;
+      color: var(--muted);
+      margin-top: -8px;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+
+    .privacy-card .policy-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12);
+      color: #bae6fd;
+      font-size: 13px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    .privacy-card .contact-email {
+      color: #7dd3fc;
+      border-bottom: none;
+      word-break: break-word;
+    }
+  </style>
+
 </head>
+
 <body>
-  <header class="site-header">
-    <a class="logo" href="/">
-      <span class="logo-mark">🎮</span>
-      <span>Hesvyn Play</span>
-    </a>
-
-```
-<nav class="nav">
-  <a href="/">Home</a>
-  <a href="/privacy.html">Privacy</a>
-  <a href="/terms.html">Terms</a>
-  <a href="/contact.html">Contact</a>
-</nav>
-```
-
-  </header>
-
-  <main class="container">
-    <section class="page-card">
-      <p class="hero-badge">Color Bridge</p>
+  <main class="privacy-only">
+    <section class="page-card privacy-card">
+      <span class="policy-badge">Color Bridge</span>
 
 ```
   <h1>Color Bridge Privacy Policy</h1>
-  <p class="footer-note">Last updated: June 27, 2026</p>
+  <p class="policy-date">Last updated: June 27, 2026</p>
 
   <p>
     Color Bridge is a free browser game by Hesvyn Play. This Privacy Policy explains how Color Bridge may store and use limited gameplay data.
@@ -109,7 +138,7 @@
   <p>
     If you have any questions about this Privacy Policy, please contact us at:
     <br>
-    <a href="mailto:hesvynplay@gmail.com">hesvynplay@gmail.com</a>
+    <span class="contact-email">hesvynplay@gmail.com</span>
   </p>
 
   <p class="footer-note">© 2026 Hesvyn Play. All rights reserved.</p>
