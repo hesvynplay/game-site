@@ -3336,7 +3336,7 @@
                     const isRainbow = b.type === 'rainbow';
                     
                     if (b.type === 'heavy') {
-                        if (isMatch || isRainbow || rainbowBridgeActive) {
+                        if (isMatch) {
                             combo++;
                             if (combo > maxCombo) maxCombo = combo;
                             b.durability--;
@@ -3385,15 +3385,9 @@
                             checkLevelUp();
                             continue;
                         }
-                        if (selectedMode === 'zen') {
-                            b.invuln = 16;
-                            b.y = bridgeY - b.height - 20;
-                            createSuccessEffect(b.x + b.width / 2, bridgeY, '#ffffff');
-                            continue;
-                        }
                     }
 
-                    if (isMatch || isRainbow || rainbowBridgeActive) {
+                    if (isMatch) {
                         b.passed = true;
                         combo++;
                         if (combo > maxCombo) maxCombo = combo;
@@ -3437,7 +3431,7 @@
                             if (runFever > runMaxFever) runMaxFever = runFever;
                         }
 
-                        if (combo > 0 && combo % 15 === 0 && !rainbowBridgeActive) {
+                        if (false && combo > 0 && combo % 15 === 0 && !rainbowBridgeActive) {
                             rainbowBridgeActive = true;
                             runRainbow++;
                             rainbowBridgeTimer = 300;
@@ -3445,7 +3439,7 @@
                             addFloatingText('RAINBOW!', w / 2, bridgeY - 80, '#ffffff');
                         }
 
-                        const basePoints = isRainbow ? 30 : 10;
+                        const basePoints = b.type === 'rainbow' ? 30 : 10;
                         const comboBonus = Math.floor(combo / 5) * 5;
                         const feverMult = feverActive ? 2 : 1;
                         const gained = Math.floor((basePoints + comboBonus) * feverMult * mode.scoreMult);
@@ -4156,15 +4150,15 @@
 
                 const auraGrad = ctx.createRadialGradient(0, -hh * 0.08, b.width * 0.08, 0, 0, b.width * 0.9);
                 auraGrad.addColorStop(0, color.hex);
-                auraGrad.addColorStop(0.22, color.glow);
-                auraGrad.addColorStop(0.58, color.hex);
+                auraGrad.addColorStop(0.10, color.glow);
+                auraGrad.addColorStop(0.36, color.hex);
                 auraGrad.addColorStop(1, 'rgba(255,255,255,0)');
                 ctx.fillStyle = auraGrad;
                 ctx.fillRect(-hw, -hh, b.width, b.height);
 
                 const shellGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
                 shellGrad.addColorStop(0, color.hex);
-                shellGrad.addColorStop(0.52, 'rgba(255,255,255,0.95)');
+                shellGrad.addColorStop(0.48, 'rgba(255,255,255,0.86)');
                 shellGrad.addColorStop(1, color.hex);
                 ctx.fillStyle = shellGrad;
                 ctx.beginPath();
