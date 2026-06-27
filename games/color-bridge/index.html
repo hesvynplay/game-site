@@ -55,19 +55,17 @@
                 width: min(100vw, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
                 aspect-ratio: 9 / 16;
             }
-            #ui {
-                justify-content: flex-start;
-                align-items: center;
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch;
-                touch-action: pan-y;
-                padding-top: max(12px, env(safe-area-inset-top));
-                padding-bottom: max(12px, env(safe-area-inset-bottom));
-            }
             .screen {
                 max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
+            }
+            #startScreen {
+                padding-top: 22px;
+                padding-bottom: calc(22px + env(safe-area-inset-bottom));
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
             }
             #gameOverScreen,
             #achScreen {
@@ -75,6 +73,10 @@
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
                 touch-action: pan-y;
+            }
+            #achScreen {
+                padding-top: calc(env(safe-area-inset-top) + 10px);
+                padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
             }
         }
         canvas {
@@ -839,14 +841,29 @@
         #achProgFill { height: 100%; width: 0%; border-radius: 5px; background: linear-gradient(90deg, #4da6ff, #00e676); transition: width 0.5s ease; }
         #achGrid { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
         @media (max-width: 899px) {
+            #ui {
+                justify-content: center;
+                align-items: center;
+                overflow: hidden;
+                padding-top: 0;
+                padding-bottom: 0;
+            }
+            #startScreen {
+                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
+                box-sizing: border-box;
+                padding-top: 20px;
+                padding-bottom: 20px;
+            }
             #achScreen {
-                padding-top: calc(env(safe-area-inset-top) + 10px);
-                padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
                 touch-action: pan-y;
             }
             #gameOverScreen {
+                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
                 touch-action: pan-y;
@@ -869,6 +886,48 @@
             }
             #rankingList {
                 touch-action: pan-y;
+            }
+            #gameOverScreen h1 {
+                font-size: 1.8em !important;
+            }
+            #finalScore {
+                font-size: 2.6em !important;
+            }
+            .stat-value {
+                font-size: 1.3em;
+            }
+            .stat-label {
+                font-size: 0.56em;
+            }
+            #rankSummary {
+                font-size: 0.88em;
+                margin-top: 10px;
+            }
+            .rank-tab {
+                font-size: 0.62em;
+                padding: 7px 3px;
+            }
+            #rankingList {
+                max-height: min(220px, 22dvh);
+            }
+            .ranking-item {
+                font-size: 0.78em;
+                padding: 5px 4px;
+            }
+            .rank {
+                width: 34px;
+            }
+            #achNew {
+                max-width: 100%;
+                padding: 8px 10px;
+            }
+            .ach-new-title {
+                font-size: 0.64em;
+            }
+            .ach-new-badge {
+                width: 34px;
+                height: 34px;
+                font-size: 1.05em;
             }
         }
         .ach-cat-head {
