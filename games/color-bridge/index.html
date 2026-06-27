@@ -9,9 +9,16 @@
     <meta name="description" content="Color Bridge - A fast-paced color switching arcade game. Tap to match colors and survive as long as you can!">
     <title>Color Bridge</title>
     <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="vendor/supabase.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        /* Montserrat bundled locally (variable font, weights 400/700/900) to avoid external CDN requests */
+        @font-face {
+            font-family: 'Montserrat';
+            font-style: normal;
+            font-weight: 100 900;
+            font-display: swap;
+            src: url('fonts/montserrat-latin.woff2') format('woff2');
+        }
         
         * {
             margin: 0;
@@ -1064,6 +1071,59 @@
     </div>
 
     <script>
+        // --- Sitelock: only allow the game to run on CrazyGames (and approved dev hosts) ---
+        (function sitelock() {
+            // Domains allowed to host OR embed the game. CrazyGames embeds the game in an iframe
+            // on its own pages, so we check both the game's own host and the parent frame origin.
+            const allowedHostSuffixes = [
+                'crazygames.com',
+                'crazygames.co.uk',
+                '1001juegos.com',
+                'localhost',
+                '127.0.0.1'
+            ];
+            const hostMatches = (h) => {
+                h = (h || '').toLowerCase();
+                return allowedHostSuffixes.some(s => h === s || h.endsWith('.' + s));
+            };
+            const originHostMatches = (origin) => {
+                try { return hostMatches(new URL(origin).hostname); } catch (e) { return false; }
+            };
+
+            // file:// (local testing) and about:srcdoc have no real hostname — allow them.
+            const protocol = window.location.protocol;
+            if (protocol === 'file:' || protocol === 'about:') return;
+
+            // 1) Game served from an allowed host.
+            if (!window.location.hostname || hostMatches(window.location.hostname)) return;
+
+            // 2) Game embedded in an iframe whose ancestor (the CrazyGames page) is allowed.
+            try {
+                const ao = window.location.ancestorOrigins;
+                if (ao && ao.length) {
+                    for (let i = 0; i < ao.length; i++) {
+                        if (originHostMatches(ao[i])) return;
+                    }
+                }
+            } catch (e) {}
+
+            // 3) Fallback: referrer (the embedding page) is an allowed host.
+            if (window.document.referrer && originHostMatches(window.document.referrer)) return;
+
+            // Unauthorized host: stop the game and show a notice.
+            try {
+                document.documentElement.innerHTML =
+                    '<body style="margin:0;display:flex;align-items:center;justify-content:center;' +
+                    'min-height:100vh;background:#050508;color:#8888a0;font-family:sans-serif;' +
+                    'text-align:center;padding:24px;">' +
+                    '<div><h1 style="color:#fff;margin:0 0 12px;">Color Bridge</h1>' +
+                    'Play this game on <a href="https://www.crazygames.com" ' +
+                    'style="color:#7fd8ff;">CrazyGames.com</a></div></body>';
+            } catch (e) {}
+            // Halt further script execution on this page.
+            throw new Error('sitelock: unauthorized host "' + host + '"');
+        })();
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const screens = {
@@ -1354,8 +1414,21 @@
         }
 
         // --- Onboarding tutorial (first-time only) ---
-        const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        const ACTION_WORD = IS_TOUCH ? 'TAP' : 'CLICK / SPACE';
+        // Detect a touch-PRIMARY device (phone/tablet) vs a PC. Checking `ontouchstart` /
+        // maxTouchPoints wrongly reports true on desktop Chrome and touchscreen laptops, so we
+        // use the pointer/hover media query instead: true only when there is no hover-capable
+        // pointer and the primary pointer is coarse (i.e. a real touch device).
+        function isTouchPrimary() {
+            try {
+                if (window.matchMedia) {
+                    return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+                }
+            } catch (e) {}
+            // Fallback for very old browsers without matchMedia.
+            return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        }
+        // Evaluated at display time so it reflects the current device.
+        function actionWord() { return isTouchPrimary() ? 'TAP' : 'CLICK / SPACE'; }
         let tutBannerTimer = null;
         let tutFreeze = false;
         let pendingTutFreeze = null;
@@ -1386,6 +1459,8 @@
                 ui.tutFreezeMsg.textContent = 'MATCH EITHER COLOR!';
             }
             block.tutType = null;
+            const contEl = document.getElementById('tutFreezeCont');
+            if (contEl) contEl.textContent = actionWord() + ' to continue';
             drawTutSpotlight(block);
             ui.tutFreeze.classList.remove('hidden');
         }
@@ -1426,7 +1501,7 @@
 
         function showBasicGuide() {
             if (getStoredFlag(STORAGE_KEYS.tutDone)) return;
-            ui.tutText.innerHTML = ACTION_WORD + '<br><span>to match the color</span>';
+            ui.tutText.innerHTML = actionWord() + '<br><span>to match the color</span>';
             ui.tutGuide.classList.remove('hidden');
         }
         function hideBasicGuide() {
@@ -3549,7 +3624,9 @@
                 if (tutFreeze) { resumeTutFreeze(); return; }
                 if (state === 'playing' && !isPaused) switchColor();
             }
-            if (e.code === 'Escape' || e.code === 'KeyP') {
+            // Pause is bound to "P" only. Escape is intentionally left to the browser so it
+            // can exit fullscreen (CrazyGames requirement: don't hijack Escape outside fullscreen).
+            if (e.code === 'KeyP') {
                 if (tutFreeze) { e.preventDefault(); resumeTutFreeze(); return; }
                 if (state === 'playing') {
                     e.preventDefault();
