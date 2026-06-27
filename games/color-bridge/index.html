@@ -1079,6 +1079,7 @@
                 'crazygames.com',
                 'crazygames.co.uk',
                 '1001juegos.com',
+                'hesvynplay.workers.dev', // own hosting / dev & staging
                 'localhost',
                 '127.0.0.1'
             ];
@@ -2890,6 +2891,7 @@
             playerName = resolvePlayerName();
             runSessionId = createRunSessionId();
             runStartAt = performance.now();
+            prefetchRanking(selectedMode); // ② warm the leaderboard cache during the run
             COLORS = (selectedMode === 'hard') ? HARD_COLORS : THEMES[currentTheme];
             isPaused = false;
             score = 0;
@@ -3217,6 +3219,43 @@
             } catch (e) {}
         }
 
+        // ② Prefetch: warm the daily-leaderboard cache while the player is in a run,
+        //    so the game-over screen has data ready without a network wait.
+        async function prefetchRanking(mode) {
+            if (!sbClient) return;
+            if (mode !== 'classic' && mode !== 'hard') return;
+            try {
+                const period = 'daily';
+                const { data, error } = await sbClient.rpc('get_leaderboard_fast', {
+                    p_mode: mode,
+                    p_period_type: period,
+                    p_period_start: periodStartDateUTC(period),
+                    p_player_id: playerId,
+                    p_limit: 100
+                });
+                if (error) return;
+                saveRankingCache(mode, period, playerId, data || []);
+            } catch (e) {}
+        }
+
+        // ③ Optimistic rows: insert the player's just-finished score into the cached
+        //    leaderboard locally (best-per-player) and recompute ranks, for instant display.
+        function buildOptimisticRows(baseRows, selfName, selfScore) {
+            const rows = (baseRows || []).map(r => ({ name: r.name, score: r.score, is_self: !!r.is_self }));
+            let prevSelfBest = -1;
+            for (let i = rows.length - 1; i >= 0; i--) {
+                if (rows[i].is_self) {
+                    if (rows[i].score > prevSelfBest) prevSelfBest = rows[i].score;
+                    rows.splice(i, 1);
+                }
+            }
+            const bestScore = Math.max(Number(selfScore) || 0, prevSelfBest);
+            rows.push({ name: selfName, score: bestScore, is_self: true });
+            rows.sort((a, b) => b.score - a.score);
+            for (let i = 0; i < rows.length; i++) rows[i].rank = i + 1;
+            return rows;
+        }
+
         async function fetchAndRenderRanking(options = {}) {
             const { showLoading = true, useCacheFirst = true } = options;
             if (selectedMode === 'zen') {
@@ -3272,7 +3311,7 @@
             });
         }
 
-        async function submitAndShowRanking() {
+        function submitAndShowRanking() {
             rankPeriod = 'daily';
             updateRankTabsUI();
             if (selectedMode === 'zen') {
@@ -3280,27 +3319,33 @@
                 return;
             }
             const label = rankPeriod === 'daily' ? 'DAILY' : 'WEEKLY';
+            const rankable = (selectedMode === 'classic' || selectedMode === 'hard');
             const cached = loadRankingCache(selectedMode, rankPeriod, playerId);
-            if (cached && cached.rows && cached.rows.length) {
-                renderRankingRows(cached.rows, playerId, playerName);
-                ui.rankSummary.classList.remove('out');
-                ui.rankSummary.textContent = `${label} UPDATING...`;
+            const baseRows = (cached && cached.rows) ? cached.rows : [];
+
+            // ③ + ② Instant render: show the (prefetched/cached) board with the player's
+            //    just-finished score inserted locally, so it appears with zero network wait.
+            if (rankable) {
+                const optimistic = buildOptimisticRows(baseRows, playerName, score);
+                const selfRank = renderRankingRows(optimistic, playerId, playerName);
+                setRankSummary(selfRank);
+            } else if (baseRows.length) {
+                const selfRank = renderRankingRows(baseRows, playerId, playerName);
+                setRankSummary(selfRank);
             } else {
                 ui.rankingList.innerHTML = '';
                 ui.rankSummary.classList.remove('out');
                 ui.rankSummary.textContent = `${label} LOADING...`;
             }
 
-            const rankable = (selectedMode === 'classic' || selectedMode === 'hard');
+            // ① Decouple submit from display: submit in the background (no await), then quietly
+            //    reconcile the optimistic board with the authoritative server result once saved.
             if (rankable) {
-                try {
-                    const playTime = Math.max(1, Math.floor((performance.now() - (runStartAt || performance.now())) / 1000));
-                    await submitScore(score, selectedMode, playerId, runSessionId, playTime, blocksCleared, maxCombo);
-                } catch (e) {
-                    console.warn('submit score failed:', e);
-                } finally {
-                    fetchAndRenderRanking({ showLoading: false, useCacheFirst: false });
-                }
+                const playTime = Math.max(1, Math.floor((performance.now() - (runStartAt || performance.now())) / 1000));
+                Promise.resolve()
+                    .then(() => submitScore(score, selectedMode, playerId, runSessionId, playTime, blocksCleared, maxCombo))
+                    .catch((e) => console.warn('submit score failed:', e))
+                    .finally(() => fetchAndRenderRanking({ showLoading: false, useCacheFirst: false }));
             } else {
                 fetchAndRenderRanking({ showLoading: false, useCacheFirst: false });
             }
