@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -14,16 +13,42 @@
       display: flex;
       align-items: flex-start;
       justify-content: center;
-      padding-top: 48px;
-      padding-bottom: 48px;
+      padding: 48px 16px;
+      box-sizing: border-box;
     }
 
     .privacy-card {
-      width: min(900px, 94%);
+      width: min(900px, 100%);
+      box-sizing: border-box;
+    }
+
+    .privacy-card * {
+      box-sizing: border-box;
     }
 
     .privacy-card h1 {
       margin-top: 18px;
+      font-size: clamp(28px, 7vw, 56px);
+      line-height: 1.15;
+      text-align: center;
+      word-break: break-word;
+    }
+
+    .privacy-card h2 {
+      font-size: clamp(18px, 4.5vw, 24px);
+      line-height: 1.3;
+    }
+
+    .privacy-card p,
+    .privacy-card li {
+      font-size: clamp(14px, 3.6vw, 16px);
+      line-height: 1.65;
+      overflow-wrap: anywhere;
+    }
+
+    .privacy-card ul {
+      padding-left: 22px;
+      margin: 8px 0 20px;
     }
 
     .privacy-card .policy-date {
@@ -44,12 +69,27 @@
       color: #bae6fd;
       font-size: 13px;
       border: 1px solid rgba(56, 189, 248, 0.25);
+      max-width: 100%;
     }
 
     .privacy-card .contact-email {
       color: #7dd3fc;
       border-bottom: none;
       word-break: break-word;
+    }
+
+    @media (max-width: 600px) {
+      .privacy-only {
+        padding: 24px 12px;
+      }
+
+      .privacy-card {
+        padding: 22px 18px;
+      }
+
+      .privacy-card .policy-date {
+        margin-bottom: 24px;
+      }
     }
   </style>
 
@@ -60,92 +100,89 @@
     <section class="page-card privacy-card">
       <span class="policy-badge">Color Bridge</span>
 
-```
-  <h1>Color Bridge Privacy Policy</h1>
-  <p class="policy-date">Last updated: June 27, 2026</p>
+      <h1>Color Bridge Privacy Policy</h1>
+      <p class="policy-date">Last updated: June 27, 2026</p>
 
-  <p>
-    Color Bridge is a free browser game by Hesvyn Play. This Privacy Policy explains how Color Bridge may store and use limited gameplay data.
-  </p>
+      <p>
+        Color Bridge is a free browser game by Hesvyn Play. This Privacy Policy explains how Color Bridge may store and use limited gameplay data.
+      </p>
 
-  <h2>Account Requirement</h2>
-  <p>
-    Color Bridge does not require players to create an account.
-  </p>
+      <h2>Account Requirement</h2>
+      <p>
+        Color Bridge does not require players to create an account.
+      </p>
 
-  <h2>Gameplay Data We May Store</h2>
-  <p>
-    Color Bridge may store non-sensitive gameplay data to provide game features such as leaderboards, high scores, achievements, daily challenges, saved preferences, and fair ranking systems.
-  </p>
+      <h2>Gameplay Data We May Store</h2>
+      <p>
+        Color Bridge may store non-sensitive gameplay data to provide game features such as leaderboards, high scores, achievements, daily challenges, saved preferences, and fair ranking systems.
+      </p>
 
-  <p>This data may include:</p>
-  <ul>
-    <li>Nickname</li>
-    <li>Score</li>
-    <li>Anonymous player ID</li>
-    <li>Gameplay session ID</li>
-    <li>Play time</li>
-    <li>Blocks cleared</li>
-    <li>Max combo</li>
-    <li>Selected game mode</li>
-    <li>Ranking period</li>
-    <li>High score</li>
-    <li>Achievements</li>
-    <li>Daily challenge progress</li>
-    <li>Mute setting and simple preferences</li>
-  </ul>
+      <p>This data may include:</p>
+      <ul>
+        <li>Nickname</li>
+        <li>Score</li>
+        <li>Anonymous player ID</li>
+        <li>Gameplay session ID</li>
+        <li>Play time</li>
+        <li>Blocks cleared</li>
+        <li>Max combo</li>
+        <li>Selected game mode</li>
+        <li>Ranking period</li>
+        <li>High score</li>
+        <li>Achievements</li>
+        <li>Daily challenge progress</li>
+        <li>Mute setting and simple preferences</li>
+      </ul>
 
-  <h2>Nickname Notice</h2>
-  <p>
-    Players should not enter their real name, email address, phone number, address, or other personal information as their nickname.
-  </p>
+      <h2>Nickname Notice</h2>
+      <p>
+        Players should not enter their real name, email address, phone number, address, or other personal information as their nickname.
+      </p>
 
-  <h2>Leaderboards</h2>
-  <p>
-    Leaderboard data may be processed using third-party backend services such as Supabase. This data is used to display rankings, maintain fair leaderboards, prevent abuse, and detect invalid score submissions.
-  </p>
+      <h2>Leaderboards</h2>
+      <p>
+        Leaderboard data may be processed using third-party backend services such as Supabase. This data is used to display rankings, maintain fair leaderboards, prevent abuse, and detect invalid score submissions.
+      </p>
 
-  <h2>Local Storage and Platform Storage</h2>
-  <p>
-    Color Bridge may use local storage and/or CrazyGames Data to save progress, settings, achievements, daily challenge progress, high scores, and similar gameplay information.
-  </p>
+      <h2>Local Storage and Platform Storage</h2>
+      <p>
+        Color Bridge may use local storage and/or CrazyGames Data to save progress, settings, achievements, daily challenge progress, high scores, and similar gameplay information.
+      </p>
 
-  <h2>Analytics and Technical Information</h2>
-  <p>
-    We may collect limited technical or usage information, such as browser type, device type, approximate region, gameplay interactions, performance information, and error information. This helps us improve game performance and user experience.
-  </p>
+      <h2>Analytics and Technical Information</h2>
+      <p>
+        We may collect limited technical or usage information, such as browser type, device type, approximate region, gameplay interactions, performance information, and error information. This helps us improve game performance and user experience.
+      </p>
 
-  <h2>Advertising</h2>
-  <p>
-    Where applicable, advertisements may be displayed through platform-approved advertising systems or third-party advertising providers.
-  </p>
+      <h2>Advertising</h2>
+      <p>
+        Where applicable, advertisements may be displayed through platform-approved advertising systems or third-party advertising providers.
+      </p>
 
-  <h2>Children’s Privacy</h2>
-  <p>
-    Color Bridge is intended for a general audience. We do not knowingly collect personal information from children. If you believe that a child has provided personal information, please contact us so we can review and remove it if necessary.
-  </p>
+      <h2>Children’s Privacy</h2>
+      <p>
+        Color Bridge is intended for a general audience. We do not knowingly collect personal information from children. If you believe that a child has provided personal information, please contact us so we can review and remove it if necessary.
+      </p>
 
-  <h2>Data Security</h2>
-  <p>
-    We take reasonable steps to protect information related to this game. However, no internet service, website, or online database can be guaranteed to be completely secure.
-  </p>
+      <h2>Data Security</h2>
+      <p>
+        We take reasonable steps to protect information related to this game. However, no internet service, website, or online database can be guaranteed to be completely secure.
+      </p>
 
-  <h2>Changes to This Policy</h2>
-  <p>
-    We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated date.
-  </p>
+      <h2>Changes to This Policy</h2>
+      <p>
+        We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated date.
+      </p>
 
-  <h2>Contact</h2>
-  <p>
-    If you have any questions about this Privacy Policy, please contact us at:
-    <br>
-    <span class="contact-email">hesvynplay@gmail.com</span>
-  </p>
+      <h2>Contact</h2>
+      <p>
+        If you have any questions about this Privacy Policy, please contact us at:
+        <br>
+        <span class="contact-email">hesvynplay@gmail.com</span>
+      </p>
 
-  <p class="footer-note">© 2026 Hesvyn Play. All rights reserved.</p>
-</section>
-```
-
+      <p class="footer-note">© 2026 Hesvyn Play. All rights reserved.</p>
+    </section>
   </main>
 </body>
 </html>
