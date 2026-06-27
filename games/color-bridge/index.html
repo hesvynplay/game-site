@@ -36,8 +36,8 @@
         }
         #gameContainer {
             position: relative;
-            width: min(100vw, 480px, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
-            aspect-ratio: 9/16;
+            width: min(67vw, 360px, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 8 / 17));
+            aspect-ratio: 8 / 17;
             background: #0a0a12;
         }
         @media (min-width: 900px) {
@@ -444,6 +444,16 @@
             max-height: 240px;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+        }
+        #gameOverScreen {
+            max-height: calc(100% - 12px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        }
+        #gameOverScreen #rankingList {
+            max-height: min(240px, 26dvh);
         }
         .ranking-item {
             display: flex;
@@ -2629,20 +2639,31 @@
             return name;
         }
 
-        function renderRankingRows(rows, selfName) {
+        function renderRankingRows(rows, selfName, selfId = null) {
             ui.rankingList.innerHTML = '';
+            ui.rankingList.scrollTop = 0;
             if (!rows || rows.length === 0) {
                 ui.rankingList.innerHTML = '<div class="ranking-item"><span class="rank">—</span><span class="r-name"></span><span class="r-score"></span></div>';
                 return -1;
             }
             let selfRank = -1;
-            let selfEl = null;
             const frag = document.createDocumentFragment();
             for (let i = 0; i < rows.length; i++) {
                 const r = rows[i];
-                const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
-                const isSelf = selfName != null && r.name === selfName && selfRank === -1;
+                const isSelf = selfRank === -1 && ((selfId != null && r.id === selfId) || (selfId == null && selfName != null && r.name === selfName));
                 if (isSelf) selfRank = i + 1;
+            }
+            let start = 0;
+            let end = Math.min(rows.length, 10);
+            if (selfRank > 0) {
+                start = Math.max(0, selfRank - 3);
+                end = Math.min(rows.length, start + 7);
+                start = Math.max(0, end - 7);
+            }
+            for (let i = start; i < end; i++) {
+                const r = rows[i];
+                const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+                const isSelf = (i + 1) === selfRank;
                 const div = document.createElement('div');
                 div.className = 'ranking-item' + (isSelf ? ' current' : '');
                 div.innerHTML =
@@ -2650,16 +2671,8 @@
                     `<span class="r-name">${escapeHtml(r.name)}</span>` +
                     `<span class="r-score">${r.score}</span>`;
                 frag.appendChild(div);
-                if (isSelf) selfEl = div;
             }
             ui.rankingList.appendChild(frag);
-            if (selfEl) {
-                // auto-scroll so the player's row sits in the middle of the list
-                requestAnimationFrame(() => {
-                    const target = selfEl.offsetTop - ui.rankingList.clientHeight / 2 + selfEl.clientHeight / 2;
-                    ui.rankingList.scrollTop = Math.max(0, target);
-                });
-            }
             return selfRank;
         }
 
@@ -2706,7 +2719,7 @@
                     .limit(1000);
                 if (error) throw error;
                 const best = dedupByBest(data || []).slice(0, 100);
-                const selfRank = renderRankingRows(best, playerName);
+                const selfRank = renderRankingRows(best, playerName, lastScoreId);
                 setRankSummary(selfRank);
             } catch (e) {
                 console.warn('fetch ranking failed:', e);
