@@ -1213,14 +1213,16 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             zen: { speedMult: 0.75, spawnMult: 1.15, feverThreshold: 12, scoreMult: 0.8 }
         };
         
+        // Score thresholds for levels 1-7; higher levels are extrapolated in scoreForLevel().
+        // (Per-level speed/effects live in getLevelConfig — this table is only the score curve.)
         const LEVEL_CONFIG = [
-            { level: 1, scoreNeeded: 0, colors: 3, speedAdd: 0, effects: [] },
-            { level: 2, scoreNeeded: 150, colors: 3, speedAdd: 0.8, effects: ['pulse'] },
-            { level: 3, scoreNeeded: 400, colors: 3, speedAdd: 1.4, effects: ['pulse', 'zebra'] },
-            { level: 4, scoreNeeded: 800, colors: 3, speedAdd: 2.0, effects: ['pulse', 'zebra', 'wobble'] },
-            { level: 5, scoreNeeded: 1400, colors: 4, speedAdd: 2.6, effects: ['pulse', 'zebra', 'wobble', 'ghost'] },
-            { level: 6, scoreNeeded: 2200, colors: 4, speedAdd: 3.2, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] },
-            { level: 7, scoreNeeded: 3200, colors: 4, speedAdd: 3.8, effects: ['pulse', 'zebra', 'wobble', 'ghost', 'rainbow'] }
+            { level: 1, scoreNeeded: 0 },
+            { level: 2, scoreNeeded: 150 },
+            { level: 3, scoreNeeded: 400 },
+            { level: 4, scoreNeeded: 800 },
+            { level: 5, scoreNeeded: 1400 },
+            { level: 6, scoreNeeded: 2200 },
+            { level: 7, scoreNeeded: 3200 }
         ];
         const BGM_VOLUME = 0.03;
         const BGM_START_OFFSET = 2;
@@ -1536,7 +1538,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             if (tutBannerTimer) { clearTimeout(tutBannerTimer); tutBannerTimer = null; }
         }
         function getLevelConfig(level) {
-            const colors = level <= 4 ? 3 : 4;
+            // Colour count is fixed by mode (classic=3 / hard=4 palette), so it isn't tracked here.
             const points = [
                 { level: 1, speedAdd: 0 },
                 { level: 5, speedAdd: 0.7 },
@@ -1565,10 +1567,9 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             if (level >= 20) effects.push('change');
             if (level >= 30) effects.push('mirror');
             if (level >= 40) effects.push('mystery');
-            if (level >= 15) effects.push('split');
             if (level >= 30) effects.push('fastspin');
             if (level >= 50) effects.push('shrink');
-            return { colors, speedAdd, effects };
+            return { speedAdd, effects };
         }
         
         function scoreForLevel(level) {
@@ -3367,9 +3368,12 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             }
         }
         
+        // Level content is fully unlocked by Lv100 (getLevelConfig caps speed/effects there);
+        // beyond that only the number rises, up to a 5000 ceiling.
+        const MAX_LEVEL = 5000;
         function checkLevelUp() {
             let nextLevel = level + 1;
-            while (score >= scoreForLevel(nextLevel)) {
+            while (nextLevel <= MAX_LEVEL && score >= scoreForLevel(nextLevel)) {
                 level = nextLevel;
                 if (level >= 30 && !lv30Reached) {
                     lv30Reached = true;
@@ -3426,9 +3430,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 let c2 = Math.floor(Math.random() * COLORS.length);
                 while (c2 === c1) c2 = Math.floor(Math.random() * COLORS.length);
                 colorIndices = [c1, c2];
-            } else if (cfg.effects.includes('split') && rand < 0.12) {
-                type = 'split';
-                colorIndices = [Math.floor(Math.random() * COLORS.length)];
             }
             // Ghost: independent roll (otherwise the zebra threshold above swallows it)
             if (type === 'normal' && cfg.effects.includes('ghost') && Math.random() < 0.12) {
@@ -3461,8 +3462,8 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             const bridgeY = h - 100;
             const isMobileLayout = window.matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             const sizeMap = isMobileLayout
-                ? { normal: 42, zebra: 44, ghost: 44, rainbow: 34, heavy: 60, speed: 42, mirror: 42, mystery: 42, change: 42, split: 42 }
-                : { normal: 62, zebra: 72, ghost: 72, rainbow: 56, heavy: 104, speed: 62, mirror: 62, mystery: 62, change: 62, split: 62 };
+                ? { normal: 42, zebra: 44, ghost: 44, heavy: 60, speed: 42, mirror: 42, mystery: 42, change: 42 }
+                : { normal: 62, zebra: 72, ghost: 72, heavy: 104, speed: 62, mirror: 62, mystery: 62, change: 62 };
             const getBlockSize = (type) => sizeMap[type] || sizeMap.normal;
             const estimateFramesToBridge = (block) => (bridgeY - (block.y + block.height)) / Math.max(0.001, block.speed);
             const estimateFramesToResolve = (block) => {
@@ -3721,7 +3722,11 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             const mode = MODES[selectedMode];
             const cfg = getLevelConfig(level);
             
-            difficulty = 1 + score / (selectedMode === 'hard' ? 450 : 2100) + cfg.speedAdd * 0.15;
+            // Speed is driven mainly by level (speedAdd). The score term only adds a mild
+            // early-game ramp and is CAPPED so it can't grow without bound — otherwise at high
+            // score the speed explodes (Lv50 hard hit ~205 px/frame) and the game is unplayable.
+            const scoreRamp = Math.min(score / (selectedMode === 'hard' ? 450 : 2100), 1.5);
+            difficulty = 1 + scoreRamp + cfg.speedAdd * 0.15;
             baseSpeed = (2.6 + difficulty * 0.7 + cfg.speedAdd) * mode.speedMult;
             speed = baseSpeed;
             
@@ -3800,10 +3805,15 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     }
                 }
                 if (b.type === 'change') {
-                    // Cycle the color while falling (~0.5s per step). Match what it shows on arrival.
+                    // Colour changes while falling, but FEWER times the faster it falls so it stays
+                    // readable: ~2 changes at slower speeds, just 1 once it gets fast. The interval
+                    // is derived from the block's total fall time so the target count is hit exactly.
+                    const targetChanges = b.speed >= 11 ? 1 : 2;
+                    const fallFrames = (bridgeY + 90) / Math.max(0.5, b.speed);
+                    const changeInterval = fallFrames / (targetChanges + 0.6);
                     b.changeTimer = (b.changeTimer || 0) + dt;
-                    if (b.changeTimer >= 90) {
-                        b.changeTimer -= 90;
+                    if (b.changeTimer >= changeInterval) {
+                        b.changeTimer -= changeInterval;
                         b.changeIndex = ((b.changeIndex || 0) + 1) % COLORS.length;
                     }
                 }
@@ -3816,8 +3826,12 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 }
                 if (cfg.effects.includes('shrink')) {
                     const shrink = Math.max(0.6, 1 - (level - 49) * 0.002);
-                    b.width = (b.type === 'zebra' ? 72 : (b.type === 'rainbow' ? 56 : (b.type === 'ghost' ? 72 : 62))) * shrink;
-                    b.height = b.width;
+                    // Scale from each block's ACTUAL spawn size (captured once), so mobile sizes
+                    // and per-type sizes (heavy/zebra/ghost...) are preserved. The old code
+                    // overwrote width with hardcoded desktop sizes, ballooning blocks on mobile.
+                    if (b.baseWidth === undefined) { b.baseWidth = b.width; b.baseHeight = b.height; }
+                    b.width = b.baseWidth * shrink;
+                    b.height = b.baseHeight * shrink;
                 }
                 
                 if (!b.passed && !b.saveChance && (b.invuln || 0) <= 0 && b.y + b.height >= bridgeY && b.y <= bridgeY + 30) {
@@ -3828,7 +3842,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             ? [COLORS[b.changeIndex % COLORS.length].name]
                             : b.colorIndices.map(i => COLORS[i].name));
                     const isMatch = blockColors.includes(currentColor);
-                    const isRainbow = b.type === 'rainbow';
                     
                     if (b.type === 'heavy') {
                         if (isMatch) {
@@ -3932,7 +3945,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             if (runFever > runMaxFever) runMaxFever = runFever;
                         }
 
-                        const basePoints = b.type === 'rainbow' ? 30 : 10;
+                        const basePoints = 10;
                         const comboBonus = Math.floor(combo / 5) * 5;
                         const feverMult = feverActive ? 2 : 1;
                         const gained = Math.floor((basePoints + comboBonus) * feverMult * mode.scoreMult);
@@ -3992,7 +4005,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                         ui.combo.textContent = 'x' + combo;
                         ui.combo.style.opacity = combo >= 2 ? '1' : '0';
 
-                        const color = isRainbow ? '#ffffff' : COLORS[currentColorIndex].hex;
+                        const color = COLORS[currentColorIndex].hex;
                         createSuccessEffect(b.x + b.width / 2, bridgeY, color);
                         
                         // Enhanced feedback texts
@@ -4135,7 +4148,16 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     }
                     return false;
                 }
-                return b.y < h + 120;
+                if (b.y < h + 120) return true;
+                // A heavy that leaves play without being destroyed (durability still > 0) must
+                // free the heavy slot, otherwise heavyBlockActive stays true and no further heavy
+                // blocks ever spawn. Destroyed heavies already cleared the flag and have durability 0.
+                if (b.type === 'heavy' && b.durability > 0) {
+                    heavyBlockActive = false;
+                    heavyBlockCooldown = 0;
+                    updateHeavyBlockBadge(0);
+                }
+                return false;
             });
             
             particles = particles.filter(p => {
@@ -4259,15 +4281,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 ctx.save();
                 ctx.globalAlpha = 0.7;
                 ctx.translate(x, y);
-                if (pb.type === 'rainbow') {
-                    const grad = ctx.createLinearGradient(-size/2, 0, size/2, 0);
-                    grad.addColorStop(0, COLORS[0].hex);
-                    grad.addColorStop(0.5, COLORS[1].hex);
-                    grad.addColorStop(1, COLORS[2].hex);
-                    ctx.fillStyle = grad;
-                    ctx.shadowColor = '#fff';
-                    ctx.shadowBlur = 10;
-                } else if (pb.type === 'zebra') {
+                if (pb.type === 'zebra') {
                     const stripeW = size / 2;
                     for (let j = 0; j < 2; j++) {
                         ctx.fillStyle = COLORS[pb.colorIndices[j % pb.colorIndices.length]].hex;
@@ -4393,23 +4407,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('x' + b.durability, 0, -4);
-            } else if (b.type === 'rainbow') {
-                const grad = ctx.createLinearGradient(-b.width/2, 0, b.width/2, 0);
-                grad.addColorStop(0, COLORS[0].hex);
-                grad.addColorStop(0.5, COLORS[1].hex);
-                grad.addColorStop(1, COLORS[2].hex);
-                ctx.fillStyle = grad;
-                ctx.shadowColor = '#ffffff';
-                ctx.shadowBlur = 20;
-                ctx.beginPath();
-                ctx.roundRect(-b.width/2, -b.height/2, b.width, b.height, 10);
-                ctx.fill();
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 22px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.shadowBlur = 0;
-                ctx.fillText('RAINBOW', 0, 0);
             } else if (b.type === 'zebra') {
                 const hw = b.width / 2;
                 const hh = b.height / 2;
