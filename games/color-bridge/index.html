@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, orientation=portrait, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -993,7 +993,7 @@
         <div id="ui">
             <div id="startScreen" class="screen">
                 <h1 style="background: linear-gradient(90deg, #ff4d4d, #4da6ff, #ffdd33); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">COLOR<br>BRIDGE</h1>
-                <p class="subtitle">TAP TO SWITCH COLORS</p>
+                <p class="subtitle">TAP / CLICK / SPACE TO SWITCH COLORS</p>
                 
                 <div class="section-title">NAME</div>
                 <input id="playerNameInput" type="text" maxlength="20" placeholder="ENTER NAME (OPTIONAL)" autocomplete="off">
@@ -1351,7 +1351,7 @@
 
         // --- Onboarding tutorial (first-time only) ---
         const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        const ACTION_WORD = IS_TOUCH ? 'TAP' : 'CLICK';
+        const ACTION_WORD = IS_TOUCH ? 'TAP' : 'CLICK / SPACE';
         let tutBannerTimer = null;
         let tutFreeze = false;
         let pendingTutFreeze = null;
@@ -2366,10 +2366,8 @@
         window.addEventListener('load', () => {
             const sdkInit = CG.init();
             sdkInit.then(() => {
-                CG.loadingStart();
                 CG.syncMuteAudio();
                 CG.registerSettingsChangeListener();
-                requestAnimationFrame(() => CG.loadingStop());
             }).catch(() => {});
             GameStorage.init(sdkInit.then(() => CG.getDataModule()));
             resolvePlayerId();
@@ -2926,6 +2924,9 @@
             if (context) context.resume().catch(() => {});
             lastTime = performance.now();
             requestAnimationFrame(gameLoop);
+        }
+        function autoPauseIfNeeded() {
+            if (state === 'playing' && !isPaused) pauseGame();
         }
         function returnToMenu() {
             state = 'start';
@@ -3547,6 +3548,11 @@
                 }
             }
         });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) autoPauseIfNeeded();
+        });
+        window.addEventListener('blur', autoPauseIfNeeded);
+        window.addEventListener('pagehide', autoPauseIfNeeded);
         
         function gameLoop(timestamp) {
             if (state !== 'playing') return;
