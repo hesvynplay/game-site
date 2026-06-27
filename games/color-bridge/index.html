@@ -52,11 +52,11 @@
         }
         @media (max-width: 899px) {
             #gameContainer {
-                width: min(100vw, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
+                width: min(100vw, calc((100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
                 aspect-ratio: 9 / 16;
             }
             .screen {
-                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+                max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
             }
@@ -69,7 +69,7 @@
             }
             #gameOverScreen,
             #achScreen {
-                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+                max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
                 touch-action: pan-y;
@@ -849,7 +849,7 @@
                 padding-bottom: 0;
             }
             #startScreen {
-                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+                max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
                 touch-action: pan-y;
@@ -863,7 +863,7 @@
                 touch-action: pan-y;
             }
             #gameOverScreen {
-                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+                max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
                 touch-action: pan-y;
@@ -936,6 +936,14 @@
         }
         .ach-cat-head span { color: rgba(255,255,255,0.35); }
         .ach-cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        #achScreen,
+        #achScreen *,
+        #startScreen,
+        #startScreen *,
+        #gameOverScreen,
+        #gameOverScreen * {
+            touch-action: pan-y;
+        }
         .ach-item {
             display: flex; align-items: center; gap: 9px;
             padding: 9px 10px; border-radius: 12px;
