@@ -3079,15 +3079,23 @@
         function periodStartISO(period) {
             const now = new Date();
             if (period === 'weekly') {
-                // start of the current week: most recent Monday 00:00 UTC
-                const dow = now.getUTCDay(); // 0=Sun,1=Mon,...6=Sat
+                const dow = now.getUTCDay();
                 const daysSinceMonday = (dow + 6) % 7;
                 const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
                 monday.setUTCDate(monday.getUTCDate() - daysSinceMonday);
                 return monday.toISOString();
             }
-            // daily = since UTC midnight
             return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)).toISOString();
+        }
+
+        function periodStartDateUTC(period) {
+            const now = new Date();
+            const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            if (period === 'weekly') {
+                const daysSinceMonday = (base.getUTCDay() + 6) % 7;
+                base.setUTCDate(base.getUTCDate() - daysSinceMonday);
+            }
+            return base.toISOString().slice(0, 10);
         }
 
         function escapeHtml(str) {
@@ -3120,23 +3128,16 @@
             }
             let selfRank = -1;
             const frag = document.createDocumentFragment();
-            const hasPlayerIds = rows.some(r => r.player_id);
-            for (let i = 0; i < rows.length; i++) {
-                const r = rows[i];
-                const isSelf = selfRank === -1 && (
-                    (selfPlayerId && r.player_id && r.player_id === selfPlayerId) ||
-                    (!hasPlayerIds && selfName != null && r.name === selfName)
-                );
-                if (isSelf) selfRank = i + 1;
-            }
             for (let i = 0; i < rows.length; i++) {
                 const r = rows[i];
                 const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
-                const isSelf = (i + 1) === selfRank;
+                const isSelf = !!r.is_self;
+                const rankValue = r.rank || (i + 1);
+                if (isSelf) selfRank = rankValue;
                 const div = document.createElement('div');
                 div.className = 'ranking-item' + (isSelf ? ' current' : '');
                 div.innerHTML =
-                    `<span class="rank ${rankClass}">${i + 1}</span>` +
+                    `<span class="rank ${rankClass}">${rankValue}</span>` +
                     `<span class="r-name">${escapeHtml(r.name)}</span>` +
                     `<span class="r-score">${r.score}</span>`;
                 frag.appendChild(div);
@@ -3169,32 +3170,61 @@
             }
         }
 
-        async function fetchAndRenderRanking() {
+        function getRankingCacheKey(mode, period, playerIdValue) {
+            return `colorBridgeLeaderboardCache_${mode}_${period}_${periodStartDateUTC(period)}_${playerIdValue}`;
+        }
+
+        function loadRankingCache(mode, period, playerIdValue) {
+            return getStoredJSON(getRankingCacheKey(mode, period, playerIdValue), null);
+        }
+
+        function saveRankingCache(mode, period, playerIdValue, rows) {
+            setStoredJSON(getRankingCacheKey(mode, period, playerIdValue), {
+                savedAt: Date.now(),
+                rows: rows || []
+            });
+        }
+
+        async function fetchAndRenderRanking(options = {}) {
+            const { showLoading = true, useCacheFirst = true } = options;
             if (!sbClient) {
-                ui.rankingList.innerHTML = '';
-                ui.rankSummary.textContent = 'Leaderboard unavailable';
-                ui.rankSummary.classList.remove('out');
+                if (showLoading) {
+                    ui.rankingList.innerHTML = '';
+                    ui.rankSummary.textContent = 'Leaderboard unavailable';
+                    ui.rankSummary.classList.remove('out');
+                }
                 return;
             }
-            ui.rankSummary.textContent = '...';
-            ui.rankSummary.classList.remove('out');
+            const label = rankPeriod === 'daily' ? 'DAILY' : 'WEEKLY';
+            const cache = useCacheFirst ? loadRankingCache(selectedMode, rankPeriod, playerId) : null;
+            if (cache && cache.rows && cache.rows.length) {
+                const selfRank = renderRankingRows(cache.rows, playerId, playerName);
+                setRankSummary(selfRank);
+                ui.rankSummary.classList.remove('out');
+                ui.rankSummary.textContent = `${label} UPDATING...`;
+            } else if (showLoading) {
+                ui.rankSummary.textContent = `${label} LOADING...`;
+                ui.rankSummary.classList.remove('out');
+            }
             try {
-                const { data, error } = await sbClient
-                    .from('scores')
-                    .select('id, name, score, player_id')
-                    .eq('mode', selectedMode)
-                    .gte('created_at', periodStartISO(rankPeriod))
-                    .order('score', { ascending: false })
-                    .order('created_at', { ascending: true })
-                    .limit(1000);
+                const { data, error } = await sbClient.rpc('get_leaderboard_fast', {
+                    p_mode: selectedMode,
+                    p_period_type: rankPeriod,
+                    p_period_start: periodStartDateUTC(rankPeriod),
+                    p_player_id: playerId,
+                    p_limit: 100
+                });
                 if (error) throw error;
-                const best = dedupByPlayerBest(data || []).slice(0, 100);
+                const best = data || [];
+                saveRankingCache(selectedMode, rankPeriod, playerId, best);
                 const selfRank = renderRankingRows(best, playerId, playerName);
                 setRankSummary(selfRank);
             } catch (e) {
                 console.warn('fetch ranking failed:', e);
-                ui.rankingList.innerHTML = '';
-                ui.rankSummary.textContent = 'Leaderboard unavailable';
+                if (showLoading) {
+                    ui.rankingList.innerHTML = '';
+                    ui.rankSummary.textContent = 'Leaderboard unavailable';
+                }
             }
         }
 
@@ -3207,6 +3237,17 @@
         async function submitAndShowRanking() {
             rankPeriod = 'daily';
             updateRankTabsUI();
+            const label = rankPeriod === 'daily' ? 'DAILY' : 'WEEKLY';
+            const cached = loadRankingCache(selectedMode, rankPeriod, playerId);
+            if (cached && cached.rows && cached.rows.length) {
+                renderRankingRows(cached.rows, playerId, playerName);
+                ui.rankSummary.classList.remove('out');
+                ui.rankSummary.textContent = `${label} UPDATING...`;
+            } else {
+                ui.rankingList.innerHTML = '';
+                ui.rankSummary.classList.remove('out');
+                ui.rankSummary.textContent = `${label} LOADING...`;
+            }
 
             const rankable = (selectedMode === 'classic' || selectedMode === 'hard');
             if (rankable) {
@@ -3215,9 +3256,12 @@
                     await submitScore(score, selectedMode, playerId, runSessionId, playTime, blocksCleared, maxCombo);
                 } catch (e) {
                     console.warn('submit score failed:', e);
+                } finally {
+                    fetchAndRenderRanking({ showLoading: false, useCacheFirst: false });
                 }
+            } else {
+                fetchAndRenderRanking({ showLoading: false, useCacheFirst: false });
             }
-            fetchAndRenderRanking();
         }
         
         function checkLevelUp() {
