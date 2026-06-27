@@ -1660,7 +1660,14 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             highScore = parseInt(GameStorage.getItem(STORAGE_KEYS.highScore)) || 0;
             lastScore = parseInt(GameStorage.getItem(STORAGE_KEYS.lastScore)) || 0;
             rankings = getStoredJSON(STORAGE_KEYS.rankings, []) || [];
-            COLORS = THEMES.neon;
+            // Never clobber the active palette mid-game. CrazyGames data can finish
+            // initializing asynchronously during a run (applyPersistentStateFromStorage ->
+            // loadData); resetting COLORS to the 3-colour classic palette there would drop
+            // HARD's 4th colour and push currentColorIndex out of range, throwing in the
+            // render loop (blocks freeze + the canvas transform leaks and skews the screen).
+            if (state !== 'playing') {
+                COLORS = (selectedMode === 'hard') ? HARD_COLORS : THEMES[currentTheme];
+            }
         }
         function saveData() {
             GameStorage.setItem(STORAGE_KEYS.highScore, highScore);
@@ -3831,7 +3838,10 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             combo++;
                             if (combo > maxCombo) maxCombo = combo;
                             b.durability--;
-                            b.invuln = 20;
+                            // Invuln must clear before the block falls back into the bridge
+                            // zone, otherwise at high level/speed it stays invulnerable while
+                            // crossing and passes through after a single hit. Keep it short.
+                            b.invuln = 10;
                             const hitColor = rainbowBridgeActive ? '#ffffff' : COLORS[currentColorIndex].hex;
                             createSuccessEffect(b.x + b.width / 2, bridgeY, hitColor);
                             if (b.durability > 0) {
@@ -3839,7 +3849,10 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                                 ui.score.textContent = score;
                                 ui.combo.textContent = 'x' + combo;
                                 ui.combo.style.opacity = combo >= 2 ? '1' : '0';
-                                b.y = bridgeY - b.height - 28;
+                                // Bounce up proportionally to the block's fall speed so the
+                                // return trip always takes a consistent ~14 frames (longer than
+                                // invuln=10) regardless of level — the next hit always registers.
+                                b.y = Math.max(20, bridgeY - b.height - Math.max(46, b.speed * 14));
                                 updateHeavyBlockBadge(b.durability);
                                 SoundManager.playHeavyHit();
                                 addFloatingText('HIT!', w / 2, bridgeY - 62, '#ffdd33');
