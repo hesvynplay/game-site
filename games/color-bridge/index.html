@@ -2454,7 +2454,11 @@
                 refreshDailyUI();
             }
         }
+        function canRecordProgressForCurrentMode() {
+            return selectedMode !== 'zen';
+        }
         function dailyAdd(type, amount) {
+            if (!canRecordProgressForCurrentMode()) return;
             rolloverDaily();
             const ch = getTodayChallenge();
             if (ch.type !== type || dailyState.done) return;
@@ -2463,6 +2467,7 @@
             finalizeDaily(ch);
         }
         function dailySetMax(type, value, mode) {
+            if (!canRecordProgressForCurrentMode()) return;
             rolloverDaily();
             const ch = getTodayChallenge();
             if (ch.type !== type || dailyState.done) return;
@@ -2614,6 +2619,7 @@
 
         // accumulate this run's stats into persistent achStats (called at game over)
         function commitRunStats() {
+            if (!canRecordProgressForCurrentMode()) return;
             achStats.totalScore += score;
             achStats.totalMatches += blocksCleared;
             achStats.heavyDestroyed += runHeavy;
@@ -2635,6 +2641,10 @@
         let runCommitted = true; // no run in progress before first game
         function commitAndCheck() {
             if (runCommitted) return [];
+            if (selectedMode === 'zen') {
+                runCommitted = true;
+                return [];
+            }
             commitRunStats();
             runCommitted = true;
             const newly = checkAchievements();
@@ -2709,7 +2719,7 @@
             const safePlayerId = String(playerIdValue || '').trim();
             const payload = {
                 name: safeName,
-                score: Math.max(0, Math.min(50000, Math.floor(Number(scoreValue) || 0))),
+                score: Math.max(0, Math.min(1000000, Math.floor(Number(scoreValue) || 0))),
                 mode,
                 playerId: safePlayerId,
                 sessionId: String(sessionId || ''),
@@ -2721,10 +2731,7 @@
             if (!payload.sessionId) throw new Error('invalid_session');
             if (!payload.name || payload.name.length > 20) throw new Error('invalid_name');
             if (!/^[a-zA-Z0-9 _.-]+$/.test(payload.name)) throw new Error('invalid_name_chars');
-            if (payload.playTime > 0) {
-                const maxReasonable = Math.max(200, payload.playTime * 120 + 1500);
-                if (payload.score > maxReasonable) throw new Error('score_too_high');
-            }
+            if (payload.score > 1000000) throw new Error('score_too_high');
             if (payload.blocksCleared > payload.playTime * 10 + 200) throw new Error('blocks_too_high');
             if (payload.maxCombo > payload.blocksCleared + 25) throw new Error('combo_too_high');
 
@@ -2846,9 +2853,11 @@
             runFeverChangeMax = 0;
             reachedLv30NoMiss = false;
             currentColorIndex = 0;
-            dailyAdd('plays', 1);
-            achStats.plays += 1;
-            saveAchStats();
+            if (selectedMode !== 'zen') {
+                dailyAdd('plays', 1);
+                achStats.plays += 1;
+                saveAchStats();
+            }
             runCommitted = false;
             lives = selectedMode === 'zen' ? 99 : maxLives;
             level = 1;
@@ -3089,23 +3098,46 @@
             }
         }
 
+        function setZenRankSummary() {
+            ui.rankingList.innerHTML = '';
+            ui.rankSummary.classList.remove('out');
+            ui.rankSummary.textContent = 'RANKINGS AVAILABLE IN CLASSIC / HARD';
+        }
+
+        const RANKING_CACHE_TTL_MS = 10 * 60 * 1000;
+
         function getRankingCacheKey(mode, period, playerIdValue) {
             return `colorBridgeLeaderboardCache_${mode}_${period}_${periodStartDateUTC(period)}_${playerIdValue}`;
         }
 
         function loadRankingCache(mode, period, playerIdValue) {
-            return getStoredJSON(getRankingCacheKey(mode, period, playerIdValue), null);
+            try {
+                const raw = localStorage.getItem(getRankingCacheKey(mode, period, playerIdValue));
+                if (!raw) return null;
+                const cache = JSON.parse(raw);
+                if (!cache || !Array.isArray(cache.rows)) return null;
+                if (!cache.savedAt || Date.now() - cache.savedAt > RANKING_CACHE_TTL_MS) return null;
+                return cache;
+            } catch (e) {
+                return null;
+            }
         }
 
         function saveRankingCache(mode, period, playerIdValue, rows) {
-            setStoredJSON(getRankingCacheKey(mode, period, playerIdValue), {
-                savedAt: Date.now(),
-                rows: rows || []
-            });
+            try {
+                localStorage.setItem(getRankingCacheKey(mode, period, playerIdValue), JSON.stringify({
+                    savedAt: Date.now(),
+                    rows: rows || []
+                }));
+            } catch (e) {}
         }
 
         async function fetchAndRenderRanking(options = {}) {
             const { showLoading = true, useCacheFirst = true } = options;
+            if (selectedMode === 'zen') {
+                setZenRankSummary();
+                return;
+            }
             if (!sbClient) {
                 if (showLoading) {
                     ui.rankingList.innerHTML = '';
@@ -3150,12 +3182,18 @@
         function updateRankTabsUI() {
             document.querySelectorAll('.period-tab').forEach(b => {
                 b.classList.toggle('active', b.dataset.period === rankPeriod);
+                b.toggleAttribute('disabled', selectedMode === 'zen');
+                b.classList.toggle('disabled', selectedMode === 'zen');
             });
         }
 
         async function submitAndShowRanking() {
             rankPeriod = 'daily';
             updateRankTabsUI();
+            if (selectedMode === 'zen') {
+                setZenRankSummary();
+                return;
+            }
             const label = rankPeriod === 'daily' ? 'DAILY' : 'WEEKLY';
             const cached = loadRankingCache(selectedMode, rankPeriod, playerId);
             if (cached && cached.rows && cached.rows.length) {
@@ -3460,6 +3498,10 @@
             btn.addEventListener('click', () => {
                 rankPeriod = btn.dataset.period;
                 updateRankTabsUI();
+                if (selectedMode === 'zen') {
+                    setZenRankSummary();
+                    return;
+                }
                 fetchAndRenderRanking();
             });
         });
