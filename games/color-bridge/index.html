@@ -1494,8 +1494,6 @@
             const baseDurability = level >= 6 ? 3 : (level >= 3 ? (Math.random() < 0.5 ? 2 : 3) : 2);
             let durability = baseDurability;
             if (level >= 8 && Math.random() < 0.18) durability = 4;
-            if (selectedMode === 'hard') durability += Math.random() < 0.35 ? 1 : 0;
-            if (selectedMode === 'zen') durability = Math.min(durability, 3);
             return Math.max(2, Math.min(durability, 4));
         }
         function updateRecoveryUI() {
@@ -3056,8 +3054,6 @@
                 }
                 blocks.push(heavyBlock);
                 heavyBlockCooldown = Math.max(30, 70 - level * 4);
-                if (selectedMode === 'hard') heavyBlockCooldown -= 8;
-                if (selectedMode === 'zen') heavyBlockCooldown += 10;
                 if (lives === 1) heavyBlockCooldown += 10;
                 if (lives === 1 && recoveryGauge >= 7) heavyBlockCooldown += 8;
                 heavyBlockNextSpawnHold = Math.max(0, durability - 1) * 30;
@@ -4159,17 +4155,17 @@
                 ctx.clip();
 
                 const auraGrad = ctx.createRadialGradient(0, -hh * 0.08, b.width * 0.08, 0, 0, b.width * 0.9);
-                auraGrad.addColorStop(0, color.glow);
-                auraGrad.addColorStop(0.34, 'rgba(255,255,255,0.36)');
-                auraGrad.addColorStop(0.62, color.hex);
+                auraGrad.addColorStop(0, color.hex);
+                auraGrad.addColorStop(0.22, color.glow);
+                auraGrad.addColorStop(0.58, color.hex);
                 auraGrad.addColorStop(1, 'rgba(255,255,255,0)');
                 ctx.fillStyle = auraGrad;
                 ctx.fillRect(-hw, -hh, b.width, b.height);
 
                 const shellGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
-                shellGrad.addColorStop(0, 'rgba(255,255,255,0.98)');
-                shellGrad.addColorStop(0.52, 'rgba(255,255,255,0.94)');
-                shellGrad.addColorStop(1, 'rgba(248,248,248,0.92)');
+                shellGrad.addColorStop(0, color.hex);
+                shellGrad.addColorStop(0.52, 'rgba(255,255,255,0.95)');
+                shellGrad.addColorStop(1, color.hex);
                 ctx.fillStyle = shellGrad;
                 ctx.beginPath();
                 ctx.moveTo(0, -hh * 0.72);
@@ -4185,7 +4181,7 @@
 
                 const mistGrad = ctx.createRadialGradient(0, hh * 0.08, 0, 0, hh * 0.08, b.width * 0.46);
                 mistGrad.addColorStop(0, color.hex);
-                mistGrad.addColorStop(0.46, 'rgba(255,255,255,0.20)');
+                mistGrad.addColorStop(0.46, color.glow);
                 mistGrad.addColorStop(1, 'rgba(255,255,255,0)');
                 ctx.fillStyle = mistGrad;
                 ctx.beginPath();
