@@ -191,39 +191,6 @@
             margin-bottom: 3px;
         }
         
-        .theme-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-bottom: 14px;
-        }
-        .theme-btn {
-            aspect-ratio: 1;
-            border: 3px solid transparent;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-        }
-        .theme-btn.active {
-            border-color: #fff;
-            transform: scale(1.05);
-            box-shadow: 0 0 20px rgba(255,255,255,0.25);
-        }
-        .theme-btn::after {
-            content: '✓';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #fff;
-            font-weight: 900;
-            font-size: 1.1em;
-            opacity: 0;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-        }
-        .theme-btn.active::after { opacity: 1; }
-        
         #topBar {
             position: absolute;
             top: 0;
@@ -1201,7 +1168,6 @@
         let rankPeriod = 'daily';
         let playerName = '';
         let playerId = '';
-        let lastScoreId = null;
         let runStartAt = 0;
         let runSessionId = '';
         const STORAGE_KEYS = {
@@ -1322,9 +1288,6 @@
                     this.removeLocalItem(key);
                 }
                 this.clearRemote();
-            },
-            isUsingCrazyGamesData() {
-                return this.usingCrazyGamesData;
             },
             async syncPersistentKeys() {
                 for (const key of PERSISTENT_KEYS) {
@@ -1486,17 +1449,6 @@
             pendingTutFreeze = null;
             if (tutBannerTimer) { clearTimeout(tutBannerTimer); tutBannerTimer = null; }
         }
-        function maybeShowHeavyHint(durability) {
-            if (getStoredFlag(STORAGE_KEYS.heavyHint)) return;
-            setStoredFlag(STORAGE_KEYS.heavyHint);
-            showTutBanner('HIT IT ' + durability + ' TIMES!', 3000);
-        }
-        function maybeShowZebraHint() {
-            if (getStoredFlag(STORAGE_KEYS.zebraHint)) return;
-            setStoredFlag(STORAGE_KEYS.zebraHint);
-            showTutBanner('MATCH EITHER COLOR!', 3000);
-        }
-        
         function getLevelConfig(level) {
             const colors = level <= 4 ? 3 : 4;
             const points = [
@@ -1902,12 +1854,6 @@
                 GameStorage.setItem(STORAGE_KEYS.muted, this.muted ? '1' : '0');
                 this.applyMuteState();
                 this.updateMuteButton();
-            },
-            muteAllAudio() {
-                this.setAudioMuted(true);
-            },
-            unmuteAllAudio() {
-                this.setAudioMuted(false);
             },
             setAudioMuted(isMuted) {
                 this.forcedMuted = !!isMuted;
@@ -2581,12 +2527,6 @@
         // Tier colors: bronze / silver / gold / legendary(purple)
         const ACH_TIERS = { bronze: '#cd7f32', silver: '#c2cad6', gold: '#ffd54a', legend: '#b14dff' };
 
-        // stat key resolver (bestScore = best of either mode)
-        function achStatValue(key) {
-            if (key === 'bestScore') return Math.max(achStats.bestClassic || 0, achStats.bestHard || 0);
-            return achStats[key] || 0;
-        }
-
         const ACHIEVEMENTS = [
             { id:'sc_c2000',  cat:'Score', name:'First Grand',  tier:'bronze', icon:'🎯', hint:'Score 2,000 in CLASSIC mode',  check:S=>S.bestClassic>=2000 },
             { id:'sc_c5000',  cat:'Score', name:'High Roller',  tier:'silver', icon:'🎯', hint:'Score 5,000 in CLASSIC mode',  check:S=>S.bestClassic>=5000 },
@@ -2733,7 +2673,8 @@
 
         function sanitizeScoreName(input) {
             const safe = String(input || '').trim().slice(0, 20).replace(/[^a-zA-Z0-9 _.-]/g, '');
-            return safe || 'anon';
+            if (safe) return safe;
+            return 'anon' + String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
         }
 
         function createRunSessionId() {
@@ -3076,18 +3017,6 @@
             showScreen('gameOver');
         }
         
-        function periodStartISO(period) {
-            const now = new Date();
-            if (period === 'weekly') {
-                const dow = now.getUTCDay();
-                const daysSinceMonday = (dow + 6) % 7;
-                const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-                monday.setUTCDate(monday.getUTCDate() - daysSinceMonday);
-                return monday.toISOString();
-            }
-            return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)).toISOString();
-        }
-
         function periodStartDateUTC(period) {
             const now = new Date();
             const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -3147,19 +3076,6 @@
             }
             ui.rankingList.appendChild(frag);
             return selfRank;
-        }
-
-        // Keep only each player's best score (dedup by player_id; fallback to name for legacy rows), preserving score order.
-        function dedupByPlayerBest(rows) {
-            const seen = new Set();
-            const result = [];
-            for (const r of rows) {
-                const key = r.player_id ? `pid:${r.player_id}` : `name:${r.name}`;
-                if (seen.has(key)) continue;
-                seen.add(key);
-                result.push(r);
-            }
-            return result;
         }
 
         function setRankSummary(selfRank) {
