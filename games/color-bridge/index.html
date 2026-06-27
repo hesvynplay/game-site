@@ -2900,6 +2900,11 @@
             const laneWidth = w * 0.70;
             const leftX = (w - laneWidth) / 2;
             const bridgeY = h - 100;
+            const isMobileLayout = window.matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const sizeMap = isMobileLayout
+                ? { normal: 42, zebra: 44, ghost: 44, rainbow: 34, heavy: 60, speed: 42, mirror: 42, mystery: 42, change: 42, split: 42 }
+                : { normal: 62, zebra: 72, ghost: 72, rainbow: 56, heavy: 104, speed: 62, mirror: 62, mystery: 62, change: 62, split: 62 };
+            const getBlockSize = (type) => sizeMap[type] || sizeMap.normal;
             const estimateFramesToBridge = (block) => (bridgeY - (block.y + block.height)) / Math.max(0.001, block.speed);
             const estimateFramesToResolve = (block) => {
                 const arrive = estimateFramesToBridge(block);
@@ -2923,7 +2928,7 @@
                 const colorIdx = (scriptIndex < 2)
                     ? currentColorIndex
                     : (currentColorIndex + 1) % COLORS.length;
-                const size = 42;
+                const size = getBlockSize('normal');
                 blocks.push({
                     x: leftX + laneWidth / 2 - size / 2,
                     y: -90,
@@ -2948,9 +2953,10 @@
 
             if (!heavyBlockActive && score >= nextHeavyBlockScore) {
                 const durability = getHeavyBlockDurability();
+                const heavySize = getBlockSize('heavy');
                 const candidateBlock = {
                     y: -136,
-                    height: 60,
+                    height: heavySize,
                     speed: speed * 0.82
                 };
                 if (blocks.some(b => !b.passed && overlapsBridgeWindow(candidateBlock, b))) {
@@ -2961,10 +2967,10 @@
                 nextHeavyBlockScore += 240 + level * 45;
                 updateHeavyBlockBadge(durability);
                 const heavyBlock = {
-                    x: leftX + laneWidth / 2 - 52,
+                    x: leftX + laneWidth / 2 - heavySize / 2,
                     y: -136,
-                    width: 60,
-                    height: 60,
+                    width: heavySize,
+                    height: heavySize,
                     speed: speed * 0.82,
                     colorIndices: [Math.floor(Math.random() * COLORS.length)],
                     type: 'heavy',
@@ -2993,9 +2999,10 @@
             
             generatePreview();
             const data = previewBlocks.shift();
+            const blockSize = getBlockSize(data.type);
             const candidateBlock = {
                 y: -90,
-                height: data.type === 'zebra' ? 42 : (data.type === 'rainbow' ? 34 : (data.type === 'ghost' ? 42 : 38)),
+                height: blockSize,
                 speed: speed * (0.9 + Math.random() * 0.2) * (data.type === 'speed' ? 1.8 : 1)
             };
             if (blocks.some(b => !b.passed && overlapsBridgeWindow(candidateBlock, b))) {
@@ -3004,10 +3011,10 @@
             }
             
             const newBlock = {
-                x: leftX + Math.random() * (laneWidth - 42),
+                x: leftX + Math.random() * (laneWidth - blockSize),
                 y: -90,
-                width: candidateBlock.height,
-                height: candidateBlock.height,
+                width: blockSize,
+                height: blockSize,
                 speed: candidateBlock.speed,
                 colorIndices: data.colorIndices,
                 type: data.type,
