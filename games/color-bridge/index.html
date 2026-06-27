@@ -2917,6 +2917,7 @@
             showScreen('pause');
         }
         function resumeGame() {
+            if (state !== 'playing') return;
             isPaused = false;
             showScreen(null);
             CG.gameplayStart();
@@ -2925,8 +2926,12 @@
             lastTime = performance.now();
             requestAnimationFrame(gameLoop);
         }
-        function autoPauseIfNeeded() {
-            if (state === 'playing' && !isPaused) pauseGame();
+        function autoPauseForVisibility() {
+            if (state !== 'playing' || isPaused) return;
+            isPaused = true;
+            const context = SoundManager.ensureContext();
+            if (context) context.suspend().catch(() => {});
+            showScreen('pause');
         }
         function returnToMenu() {
             state = 'start';
@@ -3549,10 +3554,10 @@
             }
         });
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) autoPauseIfNeeded();
+            if (document.hidden) autoPauseForVisibility();
         });
-        window.addEventListener('blur', autoPauseIfNeeded);
-        window.addEventListener('pagehide', autoPauseIfNeeded);
+        window.addEventListener('blur', autoPauseForVisibility);
+        window.addEventListener('pagehide', autoPauseForVisibility);
         
         function gameLoop(timestamp) {
             if (state !== 'playing') return;
