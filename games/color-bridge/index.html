@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -52,25 +52,43 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         }
         #gameContainer {
             position: relative;
-            width: min(100vw, 480px, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
-            aspect-ratio: 9/16;
+            /* Fill the whole player frame (any aspect). The perspective game view adapts:
+               a wide landscape lane on desktop, a tall lane on mobile portrait. No black bars. */
+            width: 100vw;
+            width: 100dvw;
+            height: 100vh;
+            height: 100dvh;
             background: #0a0a12;
+            overflow: hidden;
         }
         @media (min-width: 900px) {
-            #gameContainer {
-                width: min(90vw, calc(96vh * 4 / 5), 700px);
-                aspect-ratio: 4 / 5;
-                max-width: none;
-            }
             .screen {
                 max-width: 520px;
+                /* Fit the start / game-over / pause cards inside the (often short) landscape
+                   player height — scroll if the content is taller than the frame, never clip. */
+                max-height: calc(100vh - 16px);
+                max-height: calc(100dvh - 16px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            /* Landscape start / game-over: two side-by-side columns that fill the wide player. */
+            #startScreen, #gameOverScreen {
+                display: flex;
+                flex-direction: row;
+                align-items: stretch;
+                gap: 38px;
+                max-width: 880px;
+                padding: 30px 36px;
+            }
+            #startScreen > .sc-col, #gameOverScreen > .go-col {
+                display: flex;
+                flex-direction: column;
+                flex: 1 1 0;
+                min-width: 0;
+                justify-content: center;
             }
         }
         @media (max-width: 899px) {
-            #gameContainer {
-                width: min(100vw, calc((100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 9 / 16));
-                aspect-ratio: 9 / 16;
-            }
             .screen {
                 max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
                 overflow-y: auto;
@@ -113,7 +131,10 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             align-items: center;
         }
         .hidden { display: none !important; }
-        
+        /* Column wrappers are invisible to layout by default (mobile keeps its single column);
+           only the desktop landscape rules turn them into side-by-side columns. */
+        .sc-col, .go-col { display: contents; }
+
         .screen {
             background: rgba(8, 8, 14, 0.97);
             border-radius: 24px;
@@ -206,6 +227,15 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             display: block;
             margin-bottom: 3px;
         }
+        .mode-desc {
+            text-align: center;
+            font-size: 0.66em;
+            font-weight: 700;
+            color: rgba(255,255,255,0.55);
+            margin: 8px 0 2px;
+            letter-spacing: 0.3px;
+            min-height: 1em;
+        }
         
         #topBar {
             position: absolute;
@@ -288,27 +318,9 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             transform: scale(0.9);
         }
         
-        #rainbowBadge {
-            position: absolute;
-            top: 115px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(90deg, #ff4d4d, #ffdd33, #4da6ff, #ff00ff);
-            color: #000;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: 900;
-            font-size: 0.8em;
-            letter-spacing: 1px;
-            opacity: 0;
-            transition: opacity 0.2s;
-            pointer-events: none;
-            z-index: 10;
-            box-shadow: 0 0 20px rgba(255,255,255,0.5);
-        }
         #heavyBlockBadge {
             position: absolute;
-            top: 150px;
+            top: 184px;
             left: 50%;
             transform: translateX(-50%);
             background: linear-gradient(90deg, #ff6b35, #ff4d4d);
@@ -372,7 +384,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         }
         #feverBadge {
             position: absolute;
-            top: 115px;
+            top: 152px;
             left: 50%;
             transform: translateX(-50%);
             background: linear-gradient(90deg, #ff00cc, #3333ff);
@@ -387,44 +399,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             pointer-events: none;
             z-index: 10;
             box-shadow: 0 0 20px rgba(255,0,204,0.5);
-        }
-        
-        #safeBadge {
-            position: absolute;
-            top: 115px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(90deg, #00ff88, #00cc66);
-            color: #000;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: 900;
-            font-size: 0.8em;
-            letter-spacing: 1px;
-            opacity: 0;
-            transition: opacity 0.2s;
-            pointer-events: none;
-            z-index: 10;
-            box-shadow: 0 0 20px rgba(0,255,136,0.5);
-        }
-        
-        #saveBadge {
-            position: absolute;
-            top: 115px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(90deg, #ffdd33, #ffaa00);
-            color: #000;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: 900;
-            font-size: 0.8em;
-            letter-spacing: 1px;
-            opacity: 0;
-            transition: opacity 0.2s;
-            pointer-events: none;
-            z-index: 10;
-            box-shadow: 0 0 20px rgba(255,221,51,0.5);
         }
         
         .stats-row {
@@ -601,29 +575,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             50% { transform: translateY(-6px); }
         }
 
-        #tutBanner {
-            position: absolute;
-            top: 200px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(90deg, #ffdd33, #ffaa00);
-            color: #1a1a1a;
-            padding: 10px 22px;
-            border-radius: 22px;
-            font-weight: 900;
-            font-size: 1em;
-            letter-spacing: 0.5px;
-            white-space: nowrap;
-            z-index: 31;
-            pointer-events: none;
-            box-shadow: 0 0 24px rgba(255,200,40,0.5);
-            animation: tutBannerIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        @keyframes tutBannerIn {
-            from { opacity: 0; transform: translateX(-50%) scale(0.8); }
-            to   { opacity: 1; transform: translateX(-50%) scale(1); }
-        }
-
         #tutFreeze {
             position: absolute;
             top: 0; left: 0;
@@ -745,32 +696,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.85); }
             to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
         }
-
-        /* Achievement unlock toast */
-        #achToast {
-            position: absolute;
-            top: 120px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            gap: 11px;
-            background: rgba(20,20,28,0.96);
-            border: 2px solid #ffd54a;
-            color: #fff;
-            padding: 11px 18px;
-            border-radius: 16px;
-            font-size: 0.72em;
-            font-weight: 700;
-            line-height: 1.3;
-            white-space: nowrap;
-            z-index: 46;
-            pointer-events: none;
-            box-shadow: 0 6px 30px rgba(0,0,0,0.5);
-            animation: dailyToastIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        #achToast .ach-toast-ic { font-size: 1.8em; }
-        #achToast b { font-size: 0.85em; letter-spacing: 1px; color: #ffd54a; }
 
         /* New badges on game over */
         #achNew {
@@ -912,6 +837,33 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 height: 34px;
                 font-size: 1.05em;
             }
+            /* --- Compact the START screen so it fits one mobile screen (no scroll) --- */
+            #startScreen { padding-top: 11px; padding-bottom: 11px; }
+            #startScreen h1 { font-size: 1.85em !important; margin-bottom: 2px; }
+            #startScreen .subtitle { font-size: 0.7em; margin-bottom: 8px; }
+            #startScreen .section-title { margin: 6px 0 5px; }
+            #startScreen #playerNameInput { padding: 10px 12px; }
+            #startScreen .sc-a > div:last-child { margin-top: 4px !important; line-height: 1.25; }
+            #startScreen .mode-btn { padding: 7px 4px; }
+            #startScreen .mode-icon { font-size: 1.18em; margin-bottom: 1px; }
+            #startScreen #dailyCard { margin: 6px auto 4px; padding: 8px 12px; }
+            #startScreen .daily-head { margin-bottom: 4px; }
+            #startScreen #dailyText { margin-bottom: 5px; font-size: 0.78em; }
+            #startScreen .btn { padding: 12px 36px; }
+            #startScreen #achBtn { margin-top: 7px !important; }
+            #startScreen .sc-b > div:last-child,
+            #startScreen .sc-b > div:nth-last-child(2) { margin-top: 4px !important; line-height: 1.2; }
+            /* --- Compact the GAME OVER screen --- */
+            #gameOverScreen { padding-top: 14px; padding-bottom: 14px; }
+            #finalScore { margin: 4px 0 0 !important; }
+            #gameOverScreen .stats-row { margin: 8px 0 !important; }
+            #achNew { padding: 6px 10px !important; margin: 6px auto !important; }
+            #gameOverScreen .ach-new-badge { width: 30px; height: 30px; font-size: 0.95em; }
+            #gameOverScreen #rankSummary { margin-top: 7px; }
+            #gameOverScreen .rank-tabs { margin: 7px 0; }
+            #gameOverScreen #rankingList { max-height: min(150px, 17dvh); }
+            #gameOverScreen .btn { padding: 13px 36px; }
+            #gameOverScreen #menuBtn { margin-top: 8px !important; }
         }
         .ach-cat-head {
             color: rgba(255,255,255,0.55); font-weight: 900; font-size: 0.7em;
@@ -977,12 +929,8 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             <div id="recoveryGaugeText">LIFE 0/10</div>
         </div>
         <div id="feverBadge">FEVER x2</div>
-        <div id="safeBadge">SAFE!</div>
-        <div id="saveBadge">SAVE CHANCE!</div>
-        <div id="rainbowBadge">RAINBOW BRIDGE!</div>
         <div id="heavyBlockBadge">HEAVY x3</div>
 
-        <div id="tutBanner" class="hidden"></div>
         <div id="tutGuide" class="hidden">
             <div id="tutPulse"></div>
             <div id="tutText">CLICK / SPACE<br><span>to match the color</span></div>
@@ -992,7 +940,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             <div id="tutFreezeCont">TAP to continue</div>
         </div>
         <div id="dailyToast" class="hidden"></div>
-        <div id="achToast" class="hidden"></div>
 
         <div id="achScreen" class="hidden">
             <div id="achHeader">
@@ -1008,6 +955,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
 
         <div id="ui">
             <div id="startScreen" class="screen">
+                <div class="sc-col sc-a">
                 <h1 style="background: linear-gradient(90deg, #ff4d4d, #4da6ff, #ffdd33); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">COLOR<br>BRIDGE</h1>
                 <p class="subtitle">TAP / CLICK / SPACE TO SWITCH COLORS</p>
                 
@@ -1017,13 +965,15 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     Your name and score may appear in online rankings.
                     <div><a href="https://game-site.hesvynplay.workers.dev/games/color-bridge/privacy/" target="_blank" rel="noopener noreferrer" style="color: #7fd8ff; text-decoration: underline;">Read our Privacy Policy.</a></div>
                 </div>
-
+                </div><!-- /sc-a -->
+                <div class="sc-col sc-b">
                 <div class="section-title">MODE</div>
                 <div class="mode-grid">
                     <button class="mode-btn active" data-mode="classic"><span class="mode-icon">⚡</span>CLASSIC</button>
                     <button class="mode-btn" data-mode="hard"><span class="mode-icon">🔥</span>HARD</button>
                     <button class="mode-btn" data-mode="zen"><span class="mode-icon">🌿</span>ZEN</button>
                 </div>
+                <div id="modeDesc" class="mode-desc"></div>
 
                 <div id="dailyCard">
                     <div class="daily-head">
@@ -1039,9 +989,11 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 <button class="btn btn-secondary" id="achBtn" style="margin-top:10px"><span id="achBtnLabel">ACHIEVEMENTS  0%</span></button>
                 <div style="font-size:0.58em; color:rgba(255,255,255,0.3); margin-top:12px; text-align:center; line-height:1.4;">Use a nickname. Do not enter your real name or personal information.</div>
                 <div style="font-size:0.6em; color:rgba(255,255,255,0.35); margin-top:6px; text-align:center;">Music: Geometric Memory — HTb-music (Pixabay)</div>
+                </div><!-- /sc-b -->
             </div>
-            
+
             <div id="gameOverScreen" class="screen hidden">
+                <div class="go-col go-a">
                 <h1 style="font-size: 2.2em; color: #ff4d4d;">GAME OVER</h1>
                 <div id="finalScore" style="color: white; font-size: 3.2em; font-weight: 900; margin: 8px 0 2px;">0</div>
                 <div style="display:flex; justify-content:center; gap:12px; align-items:center; margin-bottom:8px;">
@@ -1056,6 +1008,8 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     <div class="stat-box"><div class="stat-value" id="statBlocks">0</div><div class="stat-label">BLOCKS</div></div>
                 </div>
                 
+                </div><!-- /go-a -->
+                <div class="go-col go-b">
                 <div id="rankSummary">—</div>
                 <div class="rank-tabs">
                     <div class="rank-tab-group">
@@ -1067,8 +1021,9 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 
                 <button class="btn btn-primary" id="restartBtn">RETRY</button>
                 <button class="btn btn-secondary" id="menuBtn" style="margin-top:10px">MENU</button>
+                </div><!-- /go-b -->
             </div>
-            
+
             <div id="pauseScreen" class="screen hidden">
                 <h1 style="font-size: 2em; color: #fff; margin-bottom: 24px;">PAUSED</h1>
                 
@@ -1096,31 +1051,23 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 h = (h || '').toLowerCase();
                 return allowedHostSuffixes.some(s => h === s || h.endsWith('.' + s));
             };
-            const originHostMatches = (origin) => {
-                try { return hostMatches(new URL(origin).hostname); } catch (e) { return false; }
-            };
-
             // file:// (local testing) and about:srcdoc have no real hostname — allow them.
             const protocol = window.location.protocol;
             if (protocol === 'file:' || protocol === 'about:') return;
 
-            // 1) Game served from an allowed host.
+            // 1) Game served directly from an allowed host.
             if (!window.location.hostname || hostMatches(window.location.hostname)) return;
 
-            // 2) Game embedded in an iframe whose ancestor (the CrazyGames page) is allowed.
-            try {
-                const ao = window.location.ancestorOrigins;
-                if (ao && ao.length) {
-                    for (let i = 0; i < ao.length; i++) {
-                        if (originHostMatches(ao[i])) return;
-                    }
-                }
-            } catch (e) {}
+            // 2) Embedded in an iframe — CrazyGames serves the game (and distributes it to its
+            // localized domains and partner portals) inside an iframe, so ALLOW any embedded context.
+            // This guarantees the game runs on every CrazyGames distribution domain. Only a standalone,
+            // non-allowed host (someone re-hosting the file directly, outside an iframe) is blocked.
+            let embedded = false;
+            try { embedded = window.top !== window.self; } catch (e) { embedded = true; }
+            if (embedded) return;
 
-            // 3) Fallback: referrer (the embedding page) is an allowed host.
-            if (window.document.referrer && originHostMatches(window.document.referrer)) return;
-
-            // Unauthorized host: stop the game and show a notice.
+            // Standalone on an unauthorized host: stop the game and show a notice.
+            const host = window.location.hostname;
             try {
                 document.documentElement.innerHTML =
                     '<body style="margin:0;display:flex;align-items:center;justify-content:center;' +
@@ -1144,11 +1091,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         const ui = {
             score: document.getElementById('scoreValue'),
             combo: document.getElementById('comboValue'),
-            comboDisplay: document.getElementById('comboValue'),
             feverBadge: document.getElementById('feverBadge'),
-            safeBadge: document.getElementById('safeBadge'),
-            saveBadge: document.getElementById('saveBadge'),
-            rainbowBadge: document.getElementById('rainbowBadge'),
             heavyBlockBadge: document.getElementById('heavyBlockBadge'),
             scoreCenter: document.getElementById('scoreCenter'),
             topBar: document.getElementById('topBar'),
@@ -1167,7 +1110,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             rankSummary: document.getElementById('rankSummary'),
             tutGuide: document.getElementById('tutGuide'),
             tutText: document.getElementById('tutText'),
-            tutBanner: document.getElementById('tutBanner'),
             tutFreeze: document.getElementById('tutFreeze'),
             tutFreezeMsg: document.getElementById('tutFreezeMsg'),
             dailyCard: document.getElementById('dailyCard'),
@@ -1183,7 +1125,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             achProgText: document.getElementById('achProgText'),
             achProgPct: document.getElementById('achProgPct'),
             achProgFill: document.getElementById('achProgFill'),
-            achToast: document.getElementById('achToast'),
             achNew: document.getElementById('achNew')
         };
         const stats = {
@@ -1438,7 +1379,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         }
         // Evaluated at display time so it reflects the current device.
         function actionWord() { return isTouchPrimary() ? 'TAP' : 'CLICK / SPACE'; }
-        let tutBannerTimer = null;
         let tutFreeze = false;
         let pendingTutFreeze = null;
 
@@ -1453,13 +1393,13 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 ui.tutFreezeMsg.textContent = 'MIRROR: MATCH THE NEXT COLOR!';
             } else if (block.tutType === 'ghost') {
                 setStoredFlag(STORAGE_KEYS.ghostHint);
-                ui.tutFreezeMsg.textContent = 'GHOST: MATCH THE COLOR!';
+                ui.tutFreezeMsg.textContent = 'GHOST FADES — MATCH ITS COLOR!';
             } else if (block.tutType === 'speed') {
                 setStoredFlag(STORAGE_KEYS.speedHint);
                 ui.tutFreezeMsg.textContent = 'FAST BLOCK! MATCH QUICKLY!';
             } else if (block.tutType === 'mystery') {
                 setStoredFlag(STORAGE_KEYS.mysteryHint);
-                ui.tutFreezeMsg.textContent = 'MYSTERY: COLOR REVEALS LATE!';
+                ui.tutFreezeMsg.textContent = 'MYSTERY: COLOR APPEARS MIDWAY!';
             } else if (block.tutType === 'change') {
                 setStoredFlag(STORAGE_KEYS.changeHint);
                 ui.tutFreezeMsg.textContent = 'CHANGING! MATCH ON ARRIVAL!';
@@ -1481,11 +1421,14 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             ctx.save();
             ctx.fillStyle = 'rgba(0,0,0,0.62)';
             ctx.fillRect(0, 0, w, h);
-            // glowing ring around the block
-            const cx = block.x + block.width / 2;
-            const cy = block.y + block.height / 2;
+            // glowing ring around the block — use the SAME perspective projection as
+            // drawBlock so the ring sits exactly on the (projected) block, not its raw coords.
+            const proj = perspProject(blockLaneOx(block), blockDepthT(block));
+            const drawnSize = nearBlockSize() * proj.scale * (1 + (block.pulse || 0));
+            const cx = proj.x;
+            const cy = proj.y;
             ctx.beginPath();
-            ctx.arc(cx, cy, block.width * 0.95, 0, Math.PI * 2);
+            ctx.arc(cx, cy, drawnSize * 0.82, 0, Math.PI * 2);
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 3;
             ctx.shadowColor = '#ffffff';
@@ -1519,43 +1462,46 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             }
             ui.tutGuide.classList.add('hidden');
         }
-        function showTutBanner(msg, ms) {
-            ui.tutBanner.textContent = msg;
-            ui.tutBanner.classList.remove('hidden');
-            // restart entrance animation
-            ui.tutBanner.style.animation = 'none';
-            void ui.tutBanner.offsetWidth;
-            ui.tutBanner.style.animation = '';
-            if (tutBannerTimer) clearTimeout(tutBannerTimer);
-            tutBannerTimer = setTimeout(() => ui.tutBanner.classList.add('hidden'), ms || 2800);
-        }
         function hideAllTutorial() {
             ui.tutGuide.classList.add('hidden');
-            ui.tutBanner.classList.add('hidden');
             ui.tutFreeze.classList.add('hidden');
             tutFreeze = false;
             pendingTutFreeze = null;
-            if (tutBannerTimer) { clearTimeout(tutBannerTimer); tutBannerTimer = null; }
+        }
+        // Speed only steps up at fixed checkpoints, then holds flat until the next one — so each
+        // speed-up is clearly felt. lv1-2 share a speed, lv3 jumps, lv4-5 hold, lv6 jumps, ...
+        // Checkpoints: 3, 6, 8, 10, 13, 16, 20, then every 5 levels (25, 30, 35, ...).
+        function speedCheckpoint(lv) {
+            if (lv >= 20) return 20 + Math.floor((lv - 20) / 5) * 5;
+            const cps = [16, 13, 10, 8, 6, 3];
+            for (const c of cps) if (lv >= c) return c;
+            return 1;
         }
         function getLevelConfig(level) {
             // Colour count is fixed by mode (classic=3 / hard=4 palette), so it isn't tracked here.
             const points = [
-                { level: 1, speedAdd: 0 },
-                { level: 5, speedAdd: 0.7 },
-                { level: 10, speedAdd: 1.4 },
-                { level: 20, speedAdd: 2.7 },
-                { level: 30, speedAdd: 3.9 },
-                { level: 40, speedAdd: 5.0 },
-                { level: 50, speedAdd: 6.0 },
-                { level: 70, speedAdd: 7.8 },
-                { level: 100, speedAdd: 10.0 }
+                { level: 1, speedAdd: 2.4 },
+                { level: 5, speedAdd: 5.5 },
+                { level: 10, speedAdd: 8.7 },
+                { level: 20, speedAdd: 14.0 },
+                { level: 30, speedAdd: 17.8 },
+                { level: 40, speedAdd: 20.5 },
+                { level: 50, speedAdd: 22.6 },
+                { level: 60, speedAdd: 24.4 },
+                { level: 70, speedAdd: 25.9 },
+                { level: 80, speedAdd: 27.1 },
+                { level: 90, speedAdd: 28.1 },
+                { level: 100, speedAdd: 29.0 }
             ];
-            let speedAdd = 10.0;
+            // Snap the level to its speed checkpoint so fall speed is a clear step function:
+            // it changes only at a checkpoint and stays flat (the same value) in between.
+            const sl = speedCheckpoint(level);
+            let speedAdd = 29.0;
             for (let i = 0; i < points.length - 1; i++) {
                 const a = points[i];
                 const b = points[i + 1];
-                if (level >= a.level && level <= b.level) {
-                    const t = (level - a.level) / (b.level - a.level);
+                if (sl >= a.level && sl <= b.level) {
+                    const t = (sl - a.level) / (b.level - a.level);
                     speedAdd = a.speedAdd + (b.speedAdd - a.speedAdd) * t;
                     break;
                 }
@@ -1599,11 +1545,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         let runHeavy = 0;
         let runZebra = 0;
         let runFever = 0;
-        let runRainbow = 0;
-        let runSpeed = 0;
-        let runMirror = 0;
-        let runMystery = 0;
-        let runChange = 0;
         let runMaxFever = 0;
         let noMissStreak = 0;
         let runChangeStreak = 0;
@@ -1640,16 +1581,11 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         let heavyQueued = false;
         let heavyBlockCooldown = 0;
         let recoveryGauge = 0;
-        let lifeOneRescueCooldown = 0;
         let nextHeavyBlockScore = 180;
         let backgroundHue = 0;
         let isPaused = false;
         let previewBlocks = [];
         let damageOverlayAlpha = 0;
-        let safeTime = 0;
-        let saveChanceActive = false;
-        let saveChanceTimer = 0;
-        let saveChanceBlock = null;
         let firstSuccessShown = false;
         let totalMistakes = 0;
         let scriptedRemaining = 0;
@@ -1682,6 +1618,18 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             if (ui.playerNameInput) {
                 const saved = GameStorage.getItem(STORAGE_KEYS.playerName) || '';
                 if (saved) ui.playerNameInput.value = saved;
+                // Keep the layout rock-stable while the mobile keyboard is open: pin the
+                // container to its current pixel height so 100dvh shrinking (keyboard) can't
+                // reflow the start card or make the embed momentarily look landscape.
+                ui.playerNameInput.addEventListener('focus', () => {
+                    const gc = document.getElementById('gameContainer');
+                    if (gc) gc.style.height = window.innerHeight + 'px';
+                });
+                ui.playerNameInput.addEventListener('blur', () => {
+                    const gc = document.getElementById('gameContainer');
+                    if (gc) gc.style.height = '';
+                    resize();
+                });
             }
             if (SoundManager && typeof SoundManager.applyStoredSettings === 'function') {
                 SoundManager.applyStoredSettings();
@@ -1691,6 +1639,10 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         }
         
         function resize() {
+            // While the on-screen keyboard is open for the name field, the viewport can
+            // momentarily shrink/reshape. Don't recompute the canvas then — reshaping the
+            // perspective mid-focus is what makes the start screen visibly "break".
+            if (ui && ui.playerNameInput && document.activeElement === ui.playerNameInput) return;
             const rect = document.getElementById('gameContainer').getBoundingClientRect();
             canvas.width = rect.width * window.devicePixelRatio;
             canvas.height = rect.height * window.devicePixelRatio;
@@ -1744,6 +1696,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         function updateRecoveryUI() {
             const ratio = Math.min(1, recoveryGauge / RECOVERY_NEEDED);
             ui.recoveryGaugeFill.style.width = (ratio * 100) + '%';
+            // Below max lives the gauge counts toward the next life (Classic/Hard); at max it's bonus.
             if (lives >= maxLives) {
                 ui.recoveryGaugeText.textContent = `BONUS ${recoveryGauge}/${RECOVERY_NEEDED}`;
             } else {
@@ -1754,35 +1707,45 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             recoveryGauge += amount;
             if (recoveryGauge >= RECOVERY_NEEDED) {
                 const units = Math.floor(recoveryGauge / RECOVERY_NEEDED);
-                if (selectedMode !== 'zen' && selectedMode !== 'hard' && lives < maxLives) {
+                // Classic & Hard: a full gauge (10 clean matches in a row) restores one life, up to
+                // the max. This is the ONLY life-back mechanic. At max lives (or in Zen) it's bonus points.
+                if (selectedMode !== 'zen' && lives < maxLives) {
                     const recovered = Math.min(units, maxLives - lives);
                     lives += recovered;
                     recoveryGauge -= recovered * RECOVERY_NEEDED;
                     updateLivesUI();
                     SoundManager.playLifeUp();
-                    addFloatingText('+1 LIFE!', (canvas.width / window.devicePixelRatio) / 2, (canvas.height / window.devicePixelRatio) - 130, '#00ff88');
-                    createExplosion((canvas.width / window.devicePixelRatio) / 2, (canvas.height / window.devicePixelRatio) - 100, '#00ff88', 28);
-                    ui.saveBadge.textContent = 'LIFE UP!';
-                    ui.saveBadge.style.opacity = '1';
-                    setTimeout(() => { if(ui.saveBadge) ui.saveBadge.style.opacity = '0'; }, 900);
+                    addFloatingText('+1 LIFE!', (canvas.width / window.devicePixelRatio) / 2, perspGeom().nearY - 36, '#00ff88');
+                    createExplosion((canvas.width / window.devicePixelRatio) / 2, perspGeom().nearY, '#00ff88', 28);
                 } else {
                     const bonusUnits = units;
                     recoveryGauge -= bonusUnits * RECOVERY_NEEDED;
                     const bonus = bonusUnits * 100;
                     score += bonus;
                     ui.score.textContent = score;
-                    addFloatingText('BONUS +' + bonus, (canvas.width / window.devicePixelRatio) / 2, (canvas.height / window.devicePixelRatio) - 130, '#ffdd33');
+                    addFloatingText('BONUS +' + bonus, (canvas.width / window.devicePixelRatio) / 2, perspGeom().nearY - 36, '#ffdd33');
                 }
             }
             updateRecoveryUI();
+        }
+        const MODE_DESC = {
+            classic: '3 colors · 3 lives · heal every 10 combo',
+            hard: '4 colors · faster · heal every 10 combo',
+            zen: '3 colors · relaxed · never lose'
+        };
+        function updateModeDesc() {
+            const el = document.getElementById('modeDesc');
+            if (el) el.textContent = MODE_DESC[selectedMode] || '';
         }
         document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 selectedMode = btn.dataset.mode;
+                updateModeDesc();
             });
         });
+        updateModeDesc();
         
         // Crazy Games SDK wrapper
         const CG = {
@@ -2600,7 +2563,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         let achStats = {
             plays: 0, totalScore: 0, totalMatches: 0,
             heavyDestroyed: 0, zebraMatched: 0,
-            feverCount: 0, rainbowCount: 0,
+            feverCount: 0,
             bestClassic: 0, bestHard: 0,
             maxCombo: 0, maxLevel: 0, dailyDone: 0,
             speedCleared: 0, ghostCleared: 0, changeCleared: 0,
@@ -2720,7 +2683,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             achStats.heavyDestroyed += runHeavy;
             achStats.zebraMatched += runZebra;
             achStats.feverCount += runFever;
-            achStats.rainbowCount += runRainbow;
             achStats.speedCleared += runSpeedCount;
             achStats.ghostCleared += runGhostCount;
             achStats.changeCleared += runChangeCount;
@@ -2748,28 +2710,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         }
 
         // ----- Achievements UI -----
-        let achToastQueue = [];
-        let achToastTimer = null;
-        function queueAchToasts(list) {
-            achToastQueue = achToastQueue.concat(list);
-            if (!achToastTimer) showNextAchToast();
-        }
-        function showNextAchToast() {
-            if (!ui.achToast || achToastQueue.length === 0) { achToastTimer = null; return; }
-            const a = achToastQueue.shift();
-            ui.achToast.innerHTML = '<span class="ach-toast-ic">' + a.icon + '</span>'
-                + '<span><b>ACHIEVEMENT UNLOCKED</b><br>' + a.name + '</span>';
-            ui.achToast.style.borderColor = ACH_TIERS[a.tier];
-            ui.achToast.classList.remove('hidden');
-            ui.achToast.style.animation = 'none';
-            void ui.achToast.offsetWidth;
-            ui.achToast.style.animation = '';
-            achToastTimer = setTimeout(() => {
-                ui.achToast.classList.add('hidden');
-                setTimeout(showNextAchToast, 250);
-            }, 2200);
-        }
-
         function refreshAchButton() {
             if (!ui.achBtnLabel) return;
             const p = achProgress();
@@ -2918,11 +2858,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             runHeavy = 0;
             runZebra = 0;
             runFever = 0;
-            runRainbow = 0;
-            runSpeed = 0;
-            runMirror = 0;
-            runMystery = 0;
-            runChange = 0;
             runMaxFever = 0;
             noMissStreak = 0;
             runChangeStreak = 0;
@@ -2938,7 +2873,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             lv30Reached = false;
             noMissAfterLv30 = 0;
             missedThisRun = false;
-            safeEnded = false;
+            safeEnded = true; // no safe-start period anymore, so the "after safe" no-miss streak counts from the start
             noMissAfterSafe = 0;
             noMissStreakMax = 0;
             noMissAfterLv30Max = 0;
@@ -2972,13 +2907,8 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             nextHeavyBlockScore = 180;
             heavyBlockCooldown = 0;
             recoveryGauge = 0;
-            lifeOneRescueCooldown = 0;
             heavyBlockNextSpawnHold = 0;
             damageOverlayAlpha = 0;
-            safeTime = selectedMode === 'zen' ? 0 : 120;
-            saveChanceActive = false;
-            saveChanceTimer = 0;
-            saveChanceBlock = null;
             firstSuccessShown = false;
             totalMistakes = 0;
             scriptedRemaining = (selectedMode === 'classic' && !getStoredFlag(STORAGE_KEYS.scriptDone)) ? 3 : 0;
@@ -2987,9 +2917,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             ui.score.textContent = '0';
             ui.combo.style.opacity = '0';
             ui.feverBadge.style.opacity = '0';
-            ui.safeBadge.style.opacity = selectedMode === 'zen' ? '0' : '1';
-            ui.saveBadge.style.opacity = '0';
-            ui.rainbowBadge.style.opacity = '0';
             ui.heavyBlockBadge.style.opacity = '0';
             ui.scoreDiff.style.opacity = '0';
             ui.scoreDiff.textContent = '';
@@ -3027,6 +2954,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         function autoPauseForVisibility() {
             if (state !== 'playing' || isPaused) return;
             isPaused = true;
+            CG.gameplayStop(); // tell the SDK gameplay paused (resumeGame() will gameplayStart again)
             const context = SoundManager.ensureContext();
             if (context) context.suspend().catch(() => {});
             showScreen('pause');
@@ -3035,17 +2963,15 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             state = 'start';
             isPaused = false;
             hideAllTutorial();
-            const newlyAch = commitAndCheck();
-            if (newlyAch && newlyAch.length) queueAchToasts(newlyAch);
+            // Commit + unlock achievements on exit, but DON'T toast them in-play. New unlocks are
+            // only surfaced on the game-over screen and in the Achievements screen.
+            commitAndCheck();
             refreshAchButton();
             ui.scoreCenter.classList.add('hidden');
             ui.topBar.classList.add('hidden');
             ui.pauseBtn.classList.add('hidden');
             ui.combo.style.opacity = '0';
             ui.feverBadge.style.opacity = '0';
-            ui.safeBadge.style.opacity = '0';
-            ui.saveBadge.style.opacity = '0';
-            ui.rainbowBadge.style.opacity = '0';
             ui.heavyBlockBadge.style.opacity = '0';
             CG.gameplayStop();
             SoundManager.stopBgm();
@@ -3066,9 +2992,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             SoundManager.stopBgm();
             const context = SoundManager.ensureContext();
             if (context && context.state === 'suspended') context.resume().catch(() => {});
-            ui.safeBadge.style.opacity = '0';
-            ui.saveBadge.style.opacity = '0';
-            ui.rainbowBadge.style.opacity = '0';
             ui.heavyBlockBadge.style.opacity = '0';
             const previousLastScore = lastScore;
             const isNewBest = score > highScore;
@@ -3118,9 +3041,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             ui.pauseBtn.classList.add('hidden');
             ui.combo.style.opacity = '0';
             ui.feverBadge.style.opacity = '0';
-            ui.safeBadge.style.opacity = '0';
-            ui.saveBadge.style.opacity = '0';
-            ui.rainbowBadge.style.opacity = '0';
             ui.heavyBlockBadge.style.opacity = '0';
             
             const w = canvas.width / window.devicePixelRatio;
@@ -3374,6 +3294,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         function checkLevelUp() {
             let nextLevel = level + 1;
             while (nextLevel <= MAX_LEVEL && score >= scoreForLevel(nextLevel)) {
+                const prevSpeedCp = speedCheckpoint(level);
                 level = nextLevel;
                 if (level >= 30 && !lv30Reached) {
                     lv30Reached = true;
@@ -3382,7 +3303,12 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 }
                 updateLevelUI();
                 addFloatingText('LEVEL UP!', canvas.width / window.devicePixelRatio / 2, 120, '#ffffff');
-                createLevelUpEffect();
+                // Speed only steps up at a checkpoint — show the big "SPEED UP!" + sparkle ONLY then,
+                // so it always marks a real, felt speed increase (not every level changes speed).
+                if (speedCheckpoint(level) > prevSpeedCp) {
+                    addFloatingText('SPEED UP!', canvas.width / window.devicePixelRatio / 2, canvas.height / window.devicePixelRatio / 2, '#ffe14d', 36);
+                    createLevelUpEffect();
+                }
                 if (level === 10 || level === 50 || level === 100 || level === 500 || level === 1000) {
                     CG.happytime();
                 }
@@ -3393,13 +3319,15 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
         function createLevelUpEffect() {
             const w = canvas.width / window.devicePixelRatio;
             const h = canvas.height / window.devicePixelRatio;
-            for (let i = 0; i < 50; i++) {
+            // Gold/white sparkle burst around the centre "SPEED UP!" text.
+            const sparkle = ['#ffe14d', '#ffffff', '#ffd700', '#fff6c2'];
+            for (let i = 0; i < 64; i++) {
                 particles.push({
                     x: w / 2, y: h / 2,
-                    vx: (Math.random() - 0.5) * 16,
-                    vy: (Math.random() - 0.5) * 16,
+                    vx: (Math.random() - 0.5) * 19,
+                    vy: (Math.random() - 0.5) * 19,
                     life: 1.5, size: Math.random() * 5 + 2,
-                    color: '#ffffff', type: 'levelup'
+                    color: sparkle[Math.floor(Math.random() * sparkle.length)], type: 'levelup'
                 });
             }
         }
@@ -3473,7 +3401,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 return arrive + Math.max(0, (block.durability || 1) - 1) * hitGap;
             };
             const overlapsBridgeWindow = (a, b) => {
-                const gap = 26;
+                const gap = 50;
                 const aStart = estimateFramesToBridge(a);
                 const aEnd = estimateFramesToResolve(a);
                 const bStart = estimateFramesToBridge(b);
@@ -3559,7 +3487,12 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             const candidateBlock = {
                 y: -90,
                 height: blockSize,
-                speed: speed * (0.9 + Math.random() * 0.2) * (data.type === 'speed' ? 1.8 : 1)
+                // Speed blocks are 1.8x, but capped so that even at the highest levels they take
+                // ~20 frames (~330ms) to cross the lane — fast, but still humanly reactable.
+                speed: Math.min(
+                    speed * (0.9 + Math.random() * 0.2) * (data.type === 'speed' ? 1.8 : 1),
+                    data.type === 'speed' ? (bridgeY + 90) / 20 : Infinity
+                )
             };
             if (blocks.some(b => !b.passed && overlapsBridgeWindow(candidateBlock, b))) {
                 spawnTimer = 8;
@@ -3602,7 +3535,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             }
             if (data.type === 'change') {
                 newBlock.changeIndex = Math.floor(Math.random() * COLORS.length);
-                newBlock.changeTimer = 0;
+                newBlock.changeFlips = 0;
                 if (!getStoredFlag(STORAGE_KEYS.changeHint)) {
                     newBlock.tutType = 'change';
                 }
@@ -3636,8 +3569,8 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 });
             }
         }
-        function addFloatingText(text, x, y, color) {
-            texts.push({ text, x, y, color, life: 1, vy: -1.5 });
+        function addFloatingText(text, x, y, color, size) {
+            texts.push({ text, x, y, color, life: 1, vy: -1.5, size: size || 22 });
         }
         
         document.getElementById('startBtn').addEventListener('click', startGame);
@@ -3733,7 +3666,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             spawnTimer -= dt;
             if (heavyBlockCooldown > 0) heavyBlockCooldown -= dt;
             if (heavyBlockNextSpawnHold > 0) heavyBlockNextSpawnHold -= dt;
-            if (lifeOneRescueCooldown > 0) lifeOneRescueCooldown -= dt;
             const spawnRate = Math.max(22, (70 - difficulty * 5) * mode.spawnMult);
             if (spawnTimer <= 0) {
                 if (heavyBlockCooldown <= 0) {
@@ -3761,26 +3693,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 }
             }
             
-            // Safe start timer
-            if (safeTime > 0) {
-                safeTime -= dt;
-                if (safeTime <= 0) {
-                    safeEnded = true;
-                    noMissAfterSafe = 0;
-                    ui.safeBadge.style.opacity = '0';
-                }
-            }
-            
-            // Save chance timer
-            if (saveChanceActive) {
-                saveChanceTimer -= dt;
-                if (saveChanceTimer <= 0) {
-                    saveChanceActive = false;
-                    saveChanceBlock = null;
-                    ui.saveBadge.style.opacity = '0';
-                }
-            }
-            
             for (let b of blocks) {
                 b.y += b.speed * dt;
                 b.invuln = Math.max(0, (b.invuln || 0) - dt);
@@ -3790,36 +3702,43 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 b.rotation += cfg.effects.includes('fastspin') ? 0.06 * dt : 0.025 * dt;
                 b.pulse = Math.sin(timestamp * 0.012) * 0.08;
                 if (b.type === 'ghost') {
-                    const dist = bridgeY - (b.y + b.height);
-                    if (dist < 90) {
-                        const t = Math.max(0, Math.min(1, 1 - dist / 90));
-                        b.opacity = 0.22 + t * 0.78;
-                    } else if (dist < 220) {
-                        const t = (dist - 90) / 130;
-                        b.opacity = 0.02 + t * 0.18;
-                    } else if (dist < 340) {
-                        const t = (dist - 220) / 120;
-                        b.opacity = 0.008 + (1 - t) * 0.08;
-                    } else {
-                        b.opacity = Math.max(0.001, 0.002 + Math.sin(timestamp * 0.0016 + b.wobbleOffset) * 0.002);
-                    }
+                    // Colour shown at the top, fades out toward the middle, then fades back in
+                    // toward the bridge — a gradual V, not a blink. But a fast ghost can't be
+                    // allowed to fully vanish: a speed-scaled opacity floor keeps it readable so
+                    // there's always time to react at high levels. The full dimming gimmick stays
+                    // at low/mid speeds, where the floor is ~0.
+                    const cy = b.y + b.height / 2;
+                    const mid = bridgeY * 0.5;
+                    const base = 0.5;
+                    const op = base * Math.min(1, Math.abs(cy - mid) / Math.max(1, mid));
+                    const floor = Math.min(0.42, Math.max(0, (b.speed - 12) * 0.03));
+                    b.opacity = Math.max(op, floor);
                 }
                 if (b.type === 'change') {
-                    // Colour changes while falling, but FEWER times the faster it falls so it stays
-                    // readable: ~2 changes at slower speeds, just 1 once it gets fast. The interval
-                    // is derived from the block's total fall time so the target count is hit exactly.
+                    // Colour flips while falling (~2 flips slow, 1 flip fast), but never inside the
+                    // final stretch: the last flip always lands with ~20 frames (~330ms) of lane
+                    // left, so the colour the player must match is locked in with time to react.
+                    const cy = b.y + b.height / 2;
+                    const distLeft = bridgeY - cy;
+                    const totalDist = bridgeY + 90;
                     const targetChanges = b.speed >= 11 ? 1 : 2;
-                    const fallFrames = (bridgeY + 90) / Math.max(0.5, b.speed);
-                    const changeInterval = fallFrames / (targetChanges + 0.6);
-                    b.changeTimer = (b.changeTimer || 0) + dt;
-                    if (b.changeTimer >= changeInterval) {
-                        b.changeTimer -= changeInterval;
-                        b.changeIndex = ((b.changeIndex || 0) + 1) % COLORS.length;
+                    const lockDist = Math.max(bridgeY * 0.20, b.speed * 20);
+                    const flipZone = Math.max(1, totalDist - lockDist);
+                    const done = b.changeFlips || 0;
+                    if (done < targetChanges) {
+                        const flipAt = totalDist - flipZone * (done + 1) / (targetChanges + 1);
+                        if (distLeft <= flipAt) {
+                            b.changeIndex = ((b.changeIndex || 0) + 1) % COLORS.length;
+                            b.changeFlips = done + 1;
+                        }
                     }
                 }
                 if (b.type === 'mystery' && !b.revealed) {
-                    // Reveal the real color a bit before the bridge.
-                    if (bridgeY - (b.y + b.height) < 130) b.revealed = true;
+                    // Reveal the real colour with enough lane left to react: around mid-fall at
+                    // low speed, but earlier as the block gets faster, so there are always
+                    // ~20 frames (~330ms) between the reveal and the bridge.
+                    const revealDist = Math.max(bridgeY * 0.5, b.speed * 20);
+                    if (bridgeY - (b.y + b.height / 2) <= revealDist) b.revealed = true;
                 }
                 if (cfg.effects.includes('wobble')) {
                     b.x += Math.sin(timestamp * 0.005 + b.wobbleOffset) * 0.4 * dt;
@@ -3834,7 +3753,11 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     b.height = b.baseHeight * shrink;
                 }
                 
-                if (!b.passed && !b.saveChance && (b.invuln || 0) <= 0 && b.y + b.height >= bridgeY && b.y <= bridgeY + 30) {
+                // Resolve as soon as the block reaches the bridge line. The old upper bound
+                // (b.y <= bridgeY + 40) let a fast block (or a dt=3 catch-up frame) STEP OVER the
+                // ~60px window in one frame and fall through with no life lost (a free pass).
+                // A resolved block sets b.passed (match or miss), so this can't re-fire.
+                if (!b.passed && (b.invuln || 0) <= 0 && b.y + 20 >= bridgeY) {
                     const currentColor = COLORS[currentColorIndex].name;
                     const blockColors = b.type === 'mirror'
                         ? [COLORS[(b.colorIndices[0] + 1) % COLORS.length].name]
@@ -3842,7 +3765,10 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             ? [COLORS[b.changeIndex % COLORS.length].name]
                             : b.colorIndices.map(i => COLORS[i].name));
                     const isMatch = blockColors.includes(currentColor);
-                    
+                    // Effect anchor in the perspective view: the block's projected x, at the near bridge.
+                    const efx = perspProject(blockLaneOx(b), blockDepthT(b));
+                    const efy = perspGeom().nearY;
+
                     if (b.type === 'heavy') {
                         if (isMatch) {
                             combo++;
@@ -3853,7 +3779,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             // crossing and passes through after a single hit. Keep it short.
                             b.invuln = 10;
                             const hitColor = COLORS[currentColorIndex].hex;
-                            createSuccessEffect(b.x + b.width / 2, bridgeY, hitColor);
+                            createSuccessEffect(efx.x, efy, hitColor);
                             if (b.durability > 0) {
                                 score += Math.floor(25 * mode.scoreMult);
                                 ui.score.textContent = score;
@@ -3865,7 +3791,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                                 b.y = Math.max(20, bridgeY - b.height - Math.max(46, b.speed * 14));
                                 updateHeavyBlockBadge(b.durability);
                                 SoundManager.playHeavyHit();
-                                addFloatingText('HIT!', w / 2, bridgeY - 62, '#ffdd33');
+                                addFloatingText('HIT!', w / 2, efy -62, '#ffdd33');
                                 continue;
                             }
                             b.passed = true;
@@ -3894,8 +3820,8 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             ui.combo.style.opacity = combo >= 2 ? '1' : '0';
                             if (selectedMode !== 'hard') updateRecoveryGauge(4);
                             SoundManager.playHeavyBreak();
-                            addFloatingText('CRUSHED!', w / 2, bridgeY - 70, '#ffffff');
-                            createExplosion(b.x + b.width / 2, bridgeY, '#ffffff', 34);
+                            addFloatingText('CRUSHED!', w / 2, efy -70, '#ffffff');
+                            createExplosion(efx.x, efy, '#ffffff', 34);
                             checkLevelUp();
                             continue;
                         }
@@ -3925,17 +3851,6 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                         }
                         if (runFever > runMaxFever) runMaxFever = runFever;
 
-                        if (saveChanceActive && b === saveChanceBlock) {
-                            saveChanceActive = false;
-                            saveChanceTimer = 0;
-                            saveChanceBlock = null;
-                            if (selectedMode !== 'hard') updateRecoveryGauge(5);
-                            SoundManager.playSuccess();
-                            ui.saveBadge.style.opacity = '0';
-                            addFloatingText('SAVED!', w / 2, bridgeY - 70, '#00ff88');
-                            createExplosion(b.x + b.width / 2, bridgeY, '#00ff88', 24);
-                        }
-
                         if (combo >= mode.feverThreshold && !feverActive) {
                             feverActive = true;
                             feverTimer = 1;
@@ -3956,25 +3871,22 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                         checkLevelUp();
                         if (b.type === 'zebra') { dailyAdd('zebra', 1); runZebra++; }
                         if (b.type === 'speed') {
-                            runSpeed++;
                             runSpeedCount++;
                             runTypesCleared['speed'] = 1;
                             const sb = Math.floor(15 * mode.scoreMult);
                             score += sb;
                             ui.score.textContent = score;
-                            addFloatingText('FAST! +' + sb, w / 2, bridgeY - 78, '#ffdd33');
+                            addFloatingText('FAST! +' + sb, w / 2, efy -78, '#ffdd33');
                         }
                         if (b.type === 'mirror') {
-                            runMirror++;
                             runMirrorCount++;
                             runTypesCleared['mirror'] = 1;
                             const mb = Math.floor(20 * mode.scoreMult);
                             score += mb;
                             ui.score.textContent = score;
-                            addFloatingText('MIRROR! +' + mb, w / 2, bridgeY - 78, '#7fd8ff');
+                            addFloatingText('MIRROR! +' + mb, w / 2, efy -78, '#7fd8ff');
                         }
                         if (b.type === 'mystery') {
-                            runMystery++;
                             runMysteryCount++;
                             runTypesCleared['mystery'] = 1;
                             runMysteryInStreak++;
@@ -3982,10 +3894,9 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             const myb = Math.floor(20 * mode.scoreMult);
                             score += myb;
                             ui.score.textContent = score;
-                            addFloatingText('MYSTERY! +' + myb, w / 2, bridgeY - 78, '#d6a8ff');
+                            addFloatingText('MYSTERY! +' + myb, w / 2, efy -78, '#d6a8ff');
                         }
                         if (b.type === 'change') {
-                            runChange++;
                             runChangeCount++;
                             runTypesCleared['change'] = 1;
                             runChangeStreak++;
@@ -3997,7 +3908,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                             const cb = Math.floor(18 * mode.scoreMult);
                             score += cb;
                             ui.score.textContent = score;
-                            addFloatingText('CHANGE! +' + cb, w / 2, bridgeY - 78, '#8affc8');
+                            addFloatingText('CHANGE! +' + cb, w / 2, efy -78, '#8affc8');
                         }
                         dailySetMax('score', score, selectedMode);
                         dailySetMax('combo', combo);
@@ -4006,90 +3917,32 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                         ui.combo.style.opacity = combo >= 2 ? '1' : '0';
 
                         const color = COLORS[currentColorIndex].hex;
-                        createSuccessEffect(b.x + b.width / 2, bridgeY, color);
+                        createSuccessEffect(efx.x, efy, color);
                         
                         // Enhanced feedback texts
                         if (!firstSuccessShown) {
                             firstSuccessShown = true;
                             hideBasicGuide();
-                            addFloatingText('NICE!', w/2, bridgeY - 55, '#ffffff');
+                            addFloatingText('NICE!', w/2, efy -55, '#ffffff');
                         } else if (combo === 2) {
-                            addFloatingText('GOOD!', w/2, bridgeY - 55, '#4da6ff');
+                            addFloatingText('GOOD!', w/2, efy -55, '#4da6ff');
                         } else if (combo === 3) {
-                            addFloatingText('GREAT!', w/2, bridgeY - 55, '#00ff88');
+                            addFloatingText('GREAT!', w/2, efy -55, '#00ff88');
                         } else if (combo === 5) {
-                            addFloatingText('PERFECT!', w/2, bridgeY - 55, '#ffdd33');
+                            addFloatingText('PERFECT!', w/2, efy -55, '#ffdd33');
                         } else if (combo % 5 === 0) {
-                            addFloatingText(`x${combo}`, w/2, bridgeY - 45, '#ffdd33');
+                            addFloatingText(`x${combo}`, w/2, efy -45, '#ffdd33');
                         }
                     } else {
                         // Zen mode: no damage, keep combo, peaceful pass
                         if (selectedMode === 'zen') {
                             b.passed = true;
-                            createSuccessEffect(b.x + b.width/2, bridgeY, '#ffffff');
+                            createSuccessEffect(efx.x, efy, '#ffffff');
                             continue;
                         }
                         
-                        // Safe start: no damage for first 2 seconds
-                        if (safeTime > 0) {
-                            b.passed = true;
-                            addFloatingText('SAFE!', w/2, bridgeY - 55, '#00ff88');
-                            createSuccessEffect(b.x + b.width/2, bridgeY, '#00ff88');
-                            continue;
-                        }
+                        // No safety nets in any mode: a colour mismatch always costs a life.
 
-                        if (selectedMode !== 'hard' && selectedMode !== 'zen' && lives === 1 && lifeOneRescueCooldown <= 0 && recoveryGauge >= 3) {
-                            b.passed = true;
-                            combo = 0;
-                            ui.combo.style.opacity = '0';
-                            noMissStreak = 0;
-                            runChangeStreak = 0;
-                            runGhostInStreak = 0;
-                            runMysteryInStreak = 0;
-                            noMissAfterLv30 = 0;
-                            noMissAfterSafe = 0;
-                            recoveryGauge = Math.max(0, recoveryGauge - 3);
-                            lifeOneRescueCooldown = 72;
-                            updateRecoveryUI();
-                            SoundManager.playDamage();
-                            damageOverlayAlpha = 0.18;
-                            shake = 8;
-                            addFloatingText('RESCUE!', w/2, bridgeY - 60, '#00ff88');
-                            createSuccessEffect(b.x + b.width/2, bridgeY, '#00ff88');
-                            continue;
-                        }
-                        
-                        // Miracle save: first mistake per game gives a chance to recover
-                        if (!saveChanceActive && totalMistakes === 0) {
-                            saveChanceActive = true;
-                            saveChanceTimer = 48;
-                            saveChanceBlock = b;
-                            b.saveChance = true;
-                            totalMistakes++;
-                            b.passed = false;
-                            lives--;
-                            updateLivesUI();
-                            SoundManager.playDamage();
-                            damageOverlayAlpha = 0.25;
-                            shake = 14;
-                            combo = 0;
-                            ui.combo.style.opacity = '0';
-                            noMissStreak = 0;
-                            runChangeStreak = 0;
-                            runGhostInStreak = 0;
-                            runMysteryInStreak = 0;
-                            noMissAfterLv30 = 0;
-                            noMissAfterSafe = 0;
-                            missedThisRun = true;
-                            recoveryGauge = Math.max(0, recoveryGauge - 3);
-                            updateRecoveryUI();
-                            ui.saveBadge.style.opacity = '1';
-                            addFloatingText('OUCH!', w/2, bridgeY - 55, '#ff3333');
-                            addFloatingText('SWITCH COLOR!', w/2, bridgeY - 80, '#ffdd33');
-                            createDamageEffect(w, h);
-                            continue;
-                        }
-                        
                         lives--;
                         updateLivesUI();
                         SoundManager.playDamage();
@@ -4109,16 +3962,8 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                         updateRecoveryUI();
                         b.passed = true;
                         totalMistakes++;
-                        
-                        if (!saveChanceActive) {
-                            addFloatingText('OUCH!', w/2, bridgeY - 55, '#ff3333');
-                        } else {
-                            saveChanceActive = false;
-                            saveChanceTimer = 0;
-                            saveChanceBlock = null;
-                            ui.saveBadge.style.opacity = '0';
-                        }
-                        
+                        addFloatingText('OUCH!', w/2, efy -55, '#ff3333');
+
                         if (lives <= 0) {
                             gameOver();
                             return;
@@ -4135,12 +3980,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     runMysteryInStreak = 0;
                     noMissAfterLv30 = 0;
                     noMissAfterSafe = 0;
-                    if (saveChanceActive && b === saveChanceBlock) {
-                        saveChanceActive = false;
-                        saveChanceBlock = null;
-                        saveChanceTimer = 0;
-                        ui.saveBadge.style.opacity = '0';
-                    } else if (b.type === 'heavy') {
+                    if (b.type === 'heavy') {
                         heavyBlockActive = false;
                         heavyBlockCooldown = 0;
                         updateHeavyBlockBadge(0);
@@ -4179,14 +4019,15 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             
             texts = texts.filter(t => {
                 t.y += t.vy * dt;
-                t.life -= 0.025 * dt;
+                // Big call-outs (e.g. "SPEED UP!") linger a little longer so they're not missed.
+                t.life -= ((t.size || 22) > 28 ? 0.016 : 0.025) * dt;
                 return t.life > 0;
             });
             
             if (ui.score.textContent !== String(score)) ui.score.textContent = score;
             dailySetMax('score', score, selectedMode);
             dailySetMax('combo', combo);
-            draw(w, h, bridgeY);
+            draw(w, h);
             if (pendingTutFreeze) {
                 const fb = pendingTutFreeze;
                 pendingTutFreeze = null;
@@ -4196,7 +4037,7 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             requestAnimationFrame(gameLoop);
         }
         
-        function draw(w, h, bridgeY) {
+        function draw(w, h) {
             const color = COLORS[currentColorIndex];
             const cfg = getLevelConfig(level);
             
@@ -4220,25 +4061,39 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 if (shake < 0.5) shake = 0;
             }
             
-            const laneWidth = w * 0.70;
-            const laneX = (w - laneWidth) / 2;
-            ctx.fillStyle = feverActive ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
-            ctx.fillRect(laneX, 0, laneWidth, h);
-            
-            ctx.strokeStyle = feverActive ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)';
+            // ---- Perspective lane floor: trapezoid from the near bridge up to the vanishing point ----
+            const pg = perspGeom();
+            const nearL = pg.w / 2 - pg.nearHalf, nearR = pg.w / 2 + pg.nearHalf;
+            const farL = perspProject(-1, 0), farR = perspProject(1, 0);
+            ctx.fillStyle = feverActive ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.022)';
+            ctx.beginPath();
+            ctx.moveTo(nearL, pg.nearY);
+            ctx.lineTo(nearR, pg.nearY);
+            ctx.lineTo(farR.x, farR.y);
+            ctx.lineTo(farL.x, farL.y);
+            ctx.closePath();
+            ctx.fill();
+            // side rails converging to the vanishing point
+            ctx.strokeStyle = feverActive ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.10)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(nearL, pg.nearY); ctx.lineTo(farL.x, farL.y);
+            ctx.moveTo(nearR, pg.nearY); ctx.lineTo(farR.x, farR.y);
+            ctx.stroke();
+            // depth rungs scrolling toward the viewer (sense of motion / depth)
+            ctx.strokeStyle = feverActive ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.055)';
             ctx.lineWidth = 1;
-            for (let i = 0; i < 8; i++) {
-                const y = (h / 8) * i;
-                ctx.beginPath();
-                ctx.moveTo(laneX, y);
-                ctx.lineTo(laneX + laneWidth, y);
-                ctx.stroke();
+            const rungPhase = (performance.now() / 1400) % 1;
+            for (let i = 0; i < 10; i++) {
+                const tt = (i + rungPhase) / 10;
+                const pl = perspProject(-1, tt), pr = perspProject(1, tt);
+                ctx.beginPath(); ctx.moveTo(pl.x, pl.y); ctx.lineTo(pr.x, pr.y); ctx.stroke();
             }
             
             drawPreview(w, h);
             
             for (let b of blocks) drawBlock(b, cfg);
-            drawBridge(w, bridgeY);
+            drawBridge(w);
             drawDamageOverlay(w, h);
             
             for (let p of particles) {
@@ -4257,10 +4112,10 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 ctx.save();
                 ctx.globalAlpha = t.life;
                 ctx.fillStyle = t.color;
-                ctx.font = '900 22px Montserrat, sans-serif';
+                ctx.font = '900 ' + (t.size || 22) + 'px Montserrat, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.shadowColor = t.color;
-                ctx.shadowBlur = 15;
+                ctx.shadowBlur = (t.size || 22) > 28 ? 28 : 15;
                 ctx.fillText(t.text, t.x, t.y);
                 ctx.restore();
             }
@@ -4300,6 +4155,38 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     ctx.fillStyle = COLORS[ci].hex;
                     ctx.shadowColor = COLORS[ci].hex;
                     ctx.shadowBlur = 8;
+                } else if (pb.type === 'ghost') {
+                    // small version of the falling ghost: same silhouette + eyes, semi-transparent
+                    const gc = COLORS[pb.colorIndices[0]];
+                    const hw = size / 2, hh = size / 2;
+                    ctx.globalAlpha = 0.62;
+                    const shell = ctx.createLinearGradient(-hw, -hh, hw, hh);
+                    shell.addColorStop(0, gc.hex);
+                    shell.addColorStop(0.5, 'rgba(255,255,255,0.6)');
+                    shell.addColorStop(1, gc.hex);
+                    ctx.fillStyle = shell;
+                    ctx.shadowColor = gc.glow || gc.hex;
+                    ctx.shadowBlur = 7;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -hh * 0.72);
+                    ctx.bezierCurveTo(hw * 0.38, -hh * 0.78, hw * 0.66, -hh * 0.34, hw * 0.64, hh * 0.16);
+                    ctx.bezierCurveTo(hw * 0.62, hh * 0.52, hw * 0.50, hh * 0.74, hw * 0.34, hh * 0.80);
+                    ctx.bezierCurveTo(hw * 0.24, hh * 0.84, hw * 0.18, hh * 0.71, hw * 0.10, hh * 0.62);
+                    ctx.bezierCurveTo(hw * 0.04, hh * 0.78, -hw * 0.02, hh * 0.86, -hw * 0.12, hh * 0.76);
+                    ctx.bezierCurveTo(-hw * 0.23, hh * 0.66, -hw * 0.30, hh * 0.84, -hw * 0.43, hh * 0.78);
+                    ctx.bezierCurveTo(-hw * 0.60, hh * 0.72, -hw * 0.66, hh * 0.42, -hw * 0.64, hh * 0.12);
+                    ctx.bezierCurveTo(-hw * 0.62, -hh * 0.36, -hw * 0.38, -hh * 0.76, 0, -hh * 0.72);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.globalAlpha = 0.92;
+                    ctx.fillStyle = 'rgba(22,22,28,0.92)';
+                    ctx.beginPath();
+                    ctx.ellipse(-hw * 0.2, -hh * 0.04, hw * 0.11, hh * 0.17, 0, 0, Math.PI * 2);
+                    ctx.ellipse(hw * 0.2, -hh * 0.04, hw * 0.11, hh * 0.17, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    continue;
                 } else {
                     ctx.fillStyle = COLORS[pb.colorIndices[0]].hex;
                     ctx.shadowColor = COLORS[pb.colorIndices[0]].hex;
@@ -4309,13 +4196,15 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                 ctx.roundRect(-size/2, -size/2, size, size, 6);
                 ctx.fill();
                 if (pb.type === 'speed') {
+                    // match the falling speed block: three bold downward chevrons
                     ctx.shadowBlur = 0;
                     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-                    ctx.lineWidth = 1.6;
+                    ctx.lineWidth = 1.7;
                     ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
                     const cw = size * 0.2;
-                    for (let k = 0; k < 2; k++) {
-                        const oy = -size * 0.12 + k * (size * 0.24);
+                    for (let k = 0; k < 3; k++) {
+                        const oy = -size * 0.2 + k * (size * 0.2);
                         ctx.beginPath();
                         ctx.moveTo(-cw, oy - cw * 0.5);
                         ctx.lineTo(0, oy + cw * 0.4);
@@ -4324,19 +4213,26 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
                     }
                 }
                 if (pb.type === 'mirror') {
+                    // match the falling mirror: vertical line + outward-pointing stroked arrows
                     ctx.shadowBlur = 0;
-                    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-                    ctx.lineWidth = 1.4;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+                    ctx.lineWidth = 1.6;
+                    ctx.lineCap = 'round';
                     ctx.beginPath();
-                    ctx.moveTo(0, -size * 0.32);
-                    ctx.lineTo(0, size * 0.32);
+                    ctx.moveTo(0, -size * 0.34);
+                    ctx.lineTo(0, size * 0.34);
                     ctx.stroke();
-                    ctx.fillStyle = '#fff';
-                    const aw = size * 0.14;
+                    const aw = size * 0.16;
                     ctx.beginPath();
-                    ctx.moveTo(-aw * 0.4, 0); ctx.lineTo(-aw * 1.1, -aw * 0.55); ctx.lineTo(-aw * 1.1, aw * 0.55); ctx.closePath(); ctx.fill();
+                    ctx.moveTo(-aw * 0.25, -aw * 0.65);
+                    ctx.lineTo(-aw * 1.05, 0);
+                    ctx.lineTo(-aw * 0.25, aw * 0.65);
+                    ctx.stroke();
                     ctx.beginPath();
-                    ctx.moveTo(aw * 0.4, 0); ctx.lineTo(aw * 1.1, -aw * 0.55); ctx.lineTo(aw * 1.1, aw * 0.55); ctx.closePath(); ctx.fill();
+                    ctx.moveTo(aw * 0.25, -aw * 0.65);
+                    ctx.lineTo(aw * 1.05, 0);
+                    ctx.lineTo(aw * 0.25, aw * 0.65);
+                    ctx.stroke();
                 }
                 if (pb.type === 'mystery') {
                     ctx.shadowBlur = 0;
@@ -4374,11 +4270,56 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             }
         }
         
+        // ---- Perspective (depth) projection: far vanishing point (top) -> near bridge (bottom) ----
+        function perspGeom() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            // Narrow portrait (mobile) pinches the far end too hard — ease the perspective
+            // there so the distant lane stays wider; keep the deeper perspective on wide
+            // landscape (desktop / CrazyGames PC).
+            const aspect = w / h;
+            const at = Math.max(0, Math.min(1, (aspect - 0.5) / (1.4 - 0.5)));
+            const zFar = 2.6 + (3.6 - 2.6) * at;
+            return { w, h, vanishY: h * 0.10, nearY: h - Math.max(64, h * 0.11), nearHalf: w * 0.46, zFar };
+        }
+        function perspProject(ox, t) {
+            const g = perspGeom();
+            const tc = Math.max(0, Math.min(1.08, t));
+            const z = g.zFar - (g.zFar - 1) * tc;          // far (zFar) -> near (1)
+            const scale = 1 / z;
+            const normP = (scale - 1 / g.zFar) / (1 - 1 / g.zFar); // pure-perspective 0 (far) -> 1 (near)
+            // Pure reciprocal-z makes blocks crawl near the top then whip down the final stretch.
+            // Blend in some linear motion so the approach is more even and readable, while the SIZE
+            // still scales with true perspective (the depth look is preserved). But PAST the bridge
+            // (tc > 1) we fade the easing back out, so a block that wasn't cleared slides on through
+            // and drops off-screen naturally instead of crawling/lingering at the bridge.
+            const FLATTEN = 0.5;
+            const f = tc <= 1 ? FLATTEN : FLATTEN * Math.max(0, (1.08 - tc) / 0.08);
+            const norm = normP * (1 - f) + tc * f;
+            return { x: g.w / 2 + ox * g.nearHalf * scale, y: g.vanishY + (g.nearY - g.vanishY) * norm, scale };
+        }
+        function blockDepthT(b) {
+            const h = canvas.height / window.devicePixelRatio;
+            const bridgeY = h - 100, topY = -90;
+            return Math.max(0, Math.min(1.08, (b.y - topY) / (bridgeY - topY)));
+        }
+        function blockLaneOx(b) {
+            const w = canvas.width / window.devicePixelRatio;
+            return Math.max(-0.72, Math.min(0.72, ((b.x + b.width / 2) - w / 2) / (w * 0.5)));
+        }
+        function nearBlockSize() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            return Math.max(40, Math.min(w * 0.18, h * 0.20));
+        }
+
         function drawBlock(b, cfg) {
-            const cx = b.x + b.width / 2;
-            const cy = b.y + b.height / 2;
-            const scale = 1 + b.pulse;
-            
+            const t = blockDepthT(b);
+            const proj = perspProject(blockLaneOx(b), t);
+            const cx = proj.x;
+            const cy = proj.y;
+            const scale = (nearBlockSize() / b.width) * proj.scale * (1 + b.pulse);
+
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(b.rotation);
@@ -4720,17 +4661,20 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             ctx.restore();
         }
         
-        function drawBridge(w, bridgeY) {
-            const bridgeHeight = 26;
+        function drawBridge(w) {
+            const g = perspGeom();
+            const bridgeY = g.nearY;                       // visual near plane (bottom)
+            const bridgeHeight = Math.max(16, g.h * 0.03);
+            const halfW = g.nearHalf * 0.98;               // span the near lane width
             const color = COLORS[currentColorIndex];
             const pulseSize = bridgePulse * 12;
             const specialScale = feverActive ? 1.06 : 1;
-            
+
             ctx.save();
-            ctx.translate(w/2, bridgeY + bridgeHeight/2);
+            ctx.translate(g.w / 2, bridgeY + bridgeHeight/2);
             ctx.scale(specialScale, specialScale);
-            ctx.translate(-(w-36)/2, -bridgeHeight/2);
-            
+            ctx.translate(-halfW, -bridgeHeight/2);
+
             ctx.shadowColor = color.hex;
             ctx.shadowBlur = 30 + pulseSize + (feverActive ? 20 : 0);
             const gradient = ctx.createLinearGradient(0, 0, 0, bridgeHeight);
@@ -4738,21 +4682,21 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             gradient.addColorStop(1, 'rgba(0,0,0,0.4)');
             ctx.fillStyle = gradient;
             ctx.beginPath();
-            ctx.roundRect(0, 0, w - 36, bridgeHeight, 14);
+            ctx.roundRect(0, 0, halfW * 2, bridgeHeight, 14);
             ctx.fill();
-            
+
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
             ctx.shadowBlur = 12;
             ctx.beginPath();
-            ctx.roundRect(5, 4, w - 46, 5, 2);
+            ctx.roundRect(6, 4, halfW * 2 - 12, 5, 2);
             ctx.fill();
             ctx.restore();
-            
-            const indicatorY = bridgeY + 50;
+
+            const indicatorY = Math.min(g.h - 14, bridgeY + bridgeHeight + 28);
             const dotSize = 10;
             const gap = 26;
-            const startX = w/2 - ((COLORS.length - 1) * gap) / 2;
-            
+            const startX = g.w/2 - ((COLORS.length - 1) * gap) / 2;
+
             for (let i = 0; i < COLORS.length; i++) {
                 const x = startX + i * gap;
                 ctx.beginPath();
@@ -4788,6 +4732,52 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
             ctx.fillRect(0, 0, w, h);
         }
         drawStartBackground();
+    </script>
+
+    <!-- LEVEL-TEST recording tool overlay (do NOT upload to CrazyGames) -->
+    <div id="lvlSelect" style="position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;padding:7px 8px;background:rgba(8,8,16,0.94);border-bottom:1px solid rgba(255,255,255,0.14);font-family:Montserrat,Arial,sans-serif;">
+      <span style="color:#9aa3c0;font-weight:800;font-size:12px;letter-spacing:1px;">START AT LV →</span>
+      <button data-lvl="1" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">1</button><button data-lvl="10" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">10</button><button data-lvl="20" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">20</button><button data-lvl="30" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">30</button><button data-lvl="40" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">40</button><button data-lvl="50" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">50</button><button data-lvl="60" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">60</button><button data-lvl="70" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">70</button><button data-lvl="80" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">80</button><button data-lvl="90" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">90</button><button data-lvl="100" style="background:linear-gradient(135deg,#7b3ff2,#b14bff);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-weight:900;font-size:13px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">100</button>
+      <span style="color:#5b6;font-weight:700;font-size:11px;margin-left:6px;">pick a mode first • hidden while playing</span>
+    </div>
+    <script>
+    (function(){
+      function skipTutorials(){
+        try {
+          ['heavyHint','speedHint','ghostHint','zebraHint','mirrorHint','mysteryHint','changeHint','scriptDone','tutDone'].forEach(function(k){
+            if (typeof STORAGE_KEYS !== 'undefined' && STORAGE_KEYS[k] && typeof setStoredFlag === 'function') setStoredFlag(STORAGE_KEYS[k]);
+          });
+        } catch(e){}
+      }
+      function startAtLevel(n){
+        skipTutorials();
+        try { startGame(); } catch(e){ return; }
+        if (n > 1) {
+          try {
+            level = n;
+            score = Math.max(scoreForLevel(n), 0);
+            if (level >= 30) lv30Reached = true;
+            updateLevelUI();
+            if (typeof ui !== 'undefined' && ui.score) ui.score.textContent = score;
+          } catch(e){}
+        }
+      }
+      function wire(){
+        var panel = document.getElementById('lvlSelect');
+        if (!panel || typeof startGame !== 'function') { setTimeout(wire, 60); return; }
+        skipTutorials();
+        panel.querySelectorAll('button[data-lvl]').forEach(function(b){
+          b.addEventListener('click', function(){ startAtLevel(parseInt(b.getAttribute('data-lvl'),10)); });
+        });
+        // Hide the panel while actively playing so recordings are clean; show it on
+        // the start / game-over / pause screens.
+        setInterval(function(){
+          var playing = (typeof state !== 'undefined' && state === 'playing' && !(typeof isPaused !== 'undefined' && isPaused));
+          panel.style.display = playing ? 'none' : 'flex';
+        }, 150);
+      }
+      if (document.readyState !== 'loading') wire(); else document.addEventListener('DOMContentLoaded', wire);
+    })();
     </script>
 </body>
 </html>
